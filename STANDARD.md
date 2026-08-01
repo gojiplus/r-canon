@@ -58,8 +58,15 @@ on:
   workflow_dispatch:
 jobs:
   pkgdown:
+    permissions:
+      contents: write
     uses: gojiplus/r-canon/.github/workflows/reusable-pkgdown.yml@v1
 ```
+
+That `permissions` block is required, not decorative. A called workflow cannot
+grant itself more than the caller has, and these repos default to a read-only
+token, so the deploy to `gh-pages` needs the caller to ask for write. Omit it
+and the run fails at startup in zero seconds with no log to read.
 
 `.github/workflows/test-coverage.yml`:
 

@@ -15,9 +15,6 @@ on:
         type: string
         default: "any::pkgdown, local::."
 
-permissions:
-  contents: read
-
 jobs:
   pkgdown:
     runs-on: ubuntu-latest
@@ -28,8 +25,11 @@ jobs:
     concurrency:
       group: pkgdown-${{ github.event_name != 'pull_request' || github.run_id }}
 
-    # Needed to push to gh-pages. Scoped to this job rather than the workflow
-    # so the build itself cannot write.
+    # Pushing to gh-pages needs write. A called workflow cannot grant itself
+    # more than the caller has, and these repos default to a read-only token,
+    # so the CALLER must also declare `permissions: contents: write` on the job
+    # that calls this. Without it the run fails at startup with no log. See
+    # STANDARD.md for the shim.
     permissions:
       contents: write
 
