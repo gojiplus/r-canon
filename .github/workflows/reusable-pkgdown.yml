@@ -1,0 +1,68 @@
+# The fleet's pkgdown build and deploy.
+#
+# Builds on every push and pull request so a broken site is caught in review,
+# but only deploys from the default branch and from tags. Deploying from a pull
+# request would publish an unreviewed site.
+
+name: reusable-pkgdown
+
+on:
+  workflow_call:
+    inputs:
+      extra-packages:
+        description: Additional packages to install, in the r-lib/actions format.
+        required: false
+        type: string
+        default: "any::pkgdown, local::."
+
+permissions:
+  contents: read
+
+jobs:
+  pkgdown:
+    runs-on: ubuntu-latest
+
+    # Two deploys racing each other can publish the older build last. Pull
+    # requests never deploy, so give each its own group rather than serialising
+    # them behind the branch builds.
+    concurrency:
+      group: pkgdown-${{ github.event_name != 'pull_request' || github.run_id }}
+
+    # Needed to push to gh-pages. Scoped to this job rather than the workflow
+    # so the build itself cannot write.
+    permissions:
+      contents: write
+
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: ${{ inputs.extra-packages }}
+          needs: website
+
+      - name: Build site
+        shell: Rscript {0}
+        run: pkgdown::build_site_github_pages(new_process = FALSE, install = FALSE)
+
+      - name: Deploy to gh-pages
+        # Only from the default branch or a tag. Pull requests build but do not
+        # publish.
+        if: >
+          github.event_name != 'pull_request' &&
+          (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) ||
+           startsWith(github.ref, 'refs/tags/'))
+        uses: JamesIves/github-pages-deploy-action@v4.8.0
+        with:
+          clean: false
+          branch: gh-pages
+          folder: docs

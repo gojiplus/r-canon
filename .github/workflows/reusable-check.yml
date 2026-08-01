@@ -1,0 +1,85 @@
+# The fleet's R CMD check. Repos reference this rather than copying it, so
+# changing the matrix here changes it everywhere on the next run.
+#
+# r-lib/actions does the hard part -- installing R, pandoc, and the dependency
+# tree. What lives here is the CRAN-shaped matrix and the orchestration, which
+# is the part that was drifting: five different filenames across nine repos, all
+# running slightly different versions of this.
+#
+# The matrix is deliberately fixed rather than an input. It is the five
+# configurations CRAN itself runs, and a package that needs a different set
+# needs a conversation, not a knob -- configurable standards stop being
+# standards. The inputs that do exist are the ones where packages legitimately
+# differ, and none of them reach a shell.
+
+name: reusable-check
+
+on:
+  workflow_call:
+    inputs:
+      build-args:
+        description: >
+          Arguments passed to R CMD build. The default compacts vignettes,
+          which needs ghostscript and qpdf; a package without vignettes can
+          pass 'c("--no-manual")'.
+        required: false
+        type: string
+        default: 'c("--no-manual","--compact-vignettes=gs+qpdf")'
+      error-on:
+        description: >
+          What R CMD check result fails the job. "warning" is the standard --
+          a package that cannot pass it is not ready for CRAN. Loosening this
+          to "error" is a temporary measure and belongs in a comment in the
+          calling workflow saying when it goes back.
+        required: false
+        type: string
+        default: '"warning"'
+      extra-packages:
+        description: Additional packages to install, in the r-lib/actions format.
+        required: false
+        type: string
+        default: "any::rcmdcheck"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ${{ matrix.config.os }}
+    name: ${{ matrix.config.os }} (${{ matrix.config.r }})
+
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {os: ubuntu-latest,  r: 'release'}
+          - {os: ubuntu-latest,  r: 'devel', http-user-agent: 'release'}
+          - {os: ubuntu-latest,  r: 'oldrel-1'}
+          - {os: macos-latest,   r: 'release'}
+          - {os: windows-latest, r: 'release'}
+
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      R_KEEP_PKG_SOURCE: yes
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: ${{ matrix.config.r }}
+          http-user-agent: ${{ matrix.config.http-user-agent }}
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: ${{ inputs.extra-packages }}
+          needs: check
+
+      - uses: r-lib/actions/check-r-package@v2
+        with:
+          upload-snapshots: true
+          build_args: ${{ inputs.build-args }}
+          error-on: ${{ inputs.error-on }}

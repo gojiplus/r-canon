@@ -1,0 +1,78 @@
+# The fleet's test coverage run.
+#
+# Computing coverage runs the test suite, so a failure here is a real failure
+# and fails the job. Uploading to Codecov is best-effort: a repo without a
+# CODECOV_TOKEN still gets its coverage computed, printed and kept as an
+# artifact. A missing token is a configuration gap, not a defect in the package.
+
+name: reusable-coverage
+
+on:
+  workflow_call:
+    secrets:
+      CODECOV_TOKEN:
+        description: >
+          Codecov upload token. Optional; without it coverage is still computed
+          and left as an artifact.
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      # The secrets context is not available to a step-level `if`, and a step's
+      # own `env` is not available to its own `if` either. Resolving it once at
+      # job level is the only scope where both work.
+      HAS_CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN != '' }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::covr, any::xml2
+          needs: coverage
+
+      - name: Compute coverage
+        shell: Rscript {0}
+        run: |
+          cov <- covr::package_coverage(
+            quiet = FALSE,
+            clean = FALSE,
+            install_path = file.path(normalizePath(Sys.getenv("RUNNER_TEMP"), winslash = "/"), "package")
+          )
+          print(cov)
+          cat("Coverage: ", covr::percent_coverage(cov), "%\n")
+          covr::to_cobertura(cov, filename = "cobertura.xml")
+
+      - name: Upload to Codecov
+        if: env.HAS_CODECOV_TOKEN == 'true'
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./cobertura.xml
+          plugins: noop
+          disable_search: true
+          fail_ci_if_error: false
+
+      - name: Keep the coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: cobertura.xml
+          if-no-files-found: warn
+
+      - name: Show testthat output on failure
+        if: failure()
+        shell: bash
+        run: find "${RUNNER_TEMP}/package" -name 'testthat.Rout*' -exec cat '{}' \; || true
