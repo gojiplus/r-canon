@@ -18,7 +18,15 @@ all the logic lives here, so a fix propagates on the next run.
 
 ## Adopting a repo
 
-Drop in three files, delete whatever was there before:
+```bash
+tools/adopt.sh ~/Documents/GitHub/mypackage
+```
+
+Writes the three shims, removes whatever CI was there before, and stages the
+result without committing — look at the diff first, especially for a repo whose
+bespoke workflows are worth reading before they go.
+
+By hand it is three files:
 
 ```yaml
 # .github/workflows/R-CMD-check.yml
