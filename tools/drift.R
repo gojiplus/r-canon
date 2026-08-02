@@ -76,6 +76,10 @@ audit <- function(path) {
     pkgdown = references(path, "pkgdown"),
     coverage = references(path, "coverage"),
     testthat = dir.exists(file.path(path, "tests", "testthat")),
+    # STANDARD.md requires edition 3, and until now nothing checked it. A package
+    # can sit on edition 2 -- still using context() and expect_that(is_a()), both
+    # deprecated -- and pass this audit as "tests: yes".
+    edition = desc_field(path, "Config/testthat/edition"),
     pkgdown_cfg = any(file.exists(
       file.path(path, c("_pkgdown.yml", "_pkgdown.yaml")),
       file.path(path, "pkgdown", c("_pkgdown.yml", "_pkgdown.yaml"))
@@ -116,6 +120,10 @@ main <- function(args) {
 
   mark <- function(v) if (identical(v, "ok")) "ok" else v
   yn <- function(v) if (isTRUE(v)) "yes" else "NO"
+  ed <- function(has_tests, edition) {
+    if (!isTRUE(has_tests)) return("NO")
+    if (is.na(edition)) "ed2" else paste0("ed", trimws(edition))
+  }
 
   cat("\n")
   cat(pad("repo", 13), pad("version", 9), pad("tag", 10), pad("roxygen", 9),
@@ -126,7 +134,8 @@ main <- function(args) {
   drifted <- character()
   for (r in rows) {
     bad <- !all(c(r$check, r$pkgdown, r$coverage) == "ok") ||
-      !r$testthat || !r$pkgdown_cfg || length(r$extra) > 0
+      !r$testthat || !r$pkgdown_cfg || length(r$extra) > 0 ||
+      !identical(ed(r$testthat, r$edition), "ed3")
     if (bad) drifted <- c(drifted, r$repo)
 
     cat(
@@ -137,7 +146,7 @@ main <- function(args) {
       pad(mark(r$check), 10),
       pad(mark(r$pkgdown), 10),
       pad(mark(r$coverage), 10),
-      pad(yn(r$testthat), 6),
+      pad(ed(r$testthat, r$edition), 6),
       pad(yn(r$pkgdown_cfg), 6),
       if (length(r$extra)) paste(r$extra, collapse = " ") else "-",
       "\n",

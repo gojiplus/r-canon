@@ -120,8 +120,15 @@ Rscript tools/drift.R ~/Documents/GitHub
 ```
 
 It reports whether each repo references `@v1`, uses the canonical filenames, has
-`testthat` and `pkgdown`, and whether its `DESCRIPTION` version matches its
-latest tag.
+`testthat` at **edition 3** and `pkgdown`, and whether its `DESCRIPTION` version
+matches its latest tag.
+
+The edition check earns its place: the table above has always required edition 3,
+and nothing verified it. A package can sit on edition 2 — still calling
+`context()` and `expect_that(is_a())`, both deprecated — and pass as `tests: yes`.
+Three repos were doing exactly that when the check was added. A rule the standard
+states but does not audit is a rule the fleet drifts away from silently, which is
+the whole failure mode this repo exists to prevent.
 
 ## What is deliberately not here
 
