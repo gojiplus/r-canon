@@ -99,10 +99,18 @@ on:
   schedule:
     - cron: "0 6 * * 1"
   workflow_dispatch:
+permissions:
+  contents: read
 jobs:
   links:
     uses: gojiplus/r-canon/.github/workflows/reusable-link-check.yml@v1
 ```
+
+The `permissions` block here does the opposite job to the one on `pkgdown`.
+That one *grants* write so a deploy can happen; this one *caps* the token at
+read. A called workflow can only narrow what its caller holds, so the caller is
+where the ceiling is set, and a repo whose default token is read-write would
+otherwise hand one to a job that only ever reads files.
 
 The `schedule` is not decorative either. External links rot without anyone
 committing, so a package that is finished — which is most of them — would never

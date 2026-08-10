@@ -107,6 +107,12 @@ on:
     - cron: "0 6 * * 1"
   workflow_dispatch:
 
+# The reusable workflow restricts itself to this as well, but a called workflow
+# can only ever narrow what the caller holds -- so the caller is where the
+# ceiling is actually set.
+permissions:
+  contents: read
+
 jobs:
   links:
     uses: $CANON/.github/workflows/reusable-link-check.yml@$REF
