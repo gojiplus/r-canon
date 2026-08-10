@@ -1,0 +1,171 @@
+# r-canon's own CI.
+#
+# Until this existed, the one repo the whole R fleet executes was the one repo
+# whose changes nothing validated: every workflow here is `workflow_call` or
+# tag-triggered, so a pull request reported "no checks reported" and merged on
+# nothing but a reading. The link-check workflow was validated only because a
+# consumer smoke test was run by hand from tubern.
+#
+# What is genuinely self-testable, and what is not:
+#
+#   reusable-link-check  IS. Its inputs are files, so this repo can call it on
+#                        its own README and have a real end-to-end run.
+#   reusable-check       is NOT. It runs `R CMD check` against the caller's
+#   reusable-coverage    repo root, and r-canon is not an R package. Calling
+#   reusable-pkgdown     them here would check nothing and fail. They stay
+#                        validated by the fleet's own runs, which is weaker
+#                        than a gate here and worth saying out loud.
+#
+# The tools jobs cover what can be checked without an R package: that adopt.sh
+# writes every shim the standard requires, and that drift.R passes a repo which
+# has them. Those two are the pair that broke most recently -- adopt.sh deleted
+# a repo's existing workflows and wrote only three of the four, so adopting a
+# repo destroyed the link-check.yml it had just been given.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly. A repo nobody commits to still drifts as the ecosystem moves.
+    - cron: "23 6 * * 1"
+  workflow_dispatch:
+
+# Granted per job. A workflow-level grant applies to every job, which is what
+# zizmor's excessive-permissions audit objects to once there is more than one.
+permissions: {}
+
+jobs:
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Lint workflow files
+        run: |
+          set -euo pipefail
+          curl -sL "$(curl -s https://api.github.com/repos/rhysd/actionlint/releases/latest \
+            | python3 -c 'import json,sys; print([a["browser_download_url"] for a in json.load(sys.stdin)["assets"] if "linux_amd64" in a["browser_download_url"] and a["browser_download_url"].endswith(".tar.gz")][0])')" \
+            | tar xz actionlint
+          ./actionlint .github/workflows/*.yml
+
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check the adoption script
+        run: shellcheck tools/adopt.sh
+
+  tools:
+    name: adopt.sh and drift.R
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: r-lib/actions/setup-r@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
+        with:
+          use-public-rspm: true
+
+      # A package that satisfies everything STANDARD.md asks for except the
+      # workflows, which adopt.sh is about to write. Built by hand rather than
+      # with usethis so this job needs no packages beyond base R.
+      - name: Build a fixture package
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/fixture/tests/testthat
+          cat > /tmp/fixture/DESCRIPTION <<'DCF'
+          Package: fixture
+          Version: 0.1.0
+          Config/testthat/edition: 3
+          DCF
+          printf 'url: https://example.invalid/fixture\n' > /tmp/fixture/_pkgdown.yml
+
+      - name: adopt.sh writes every shim the standard requires
+        run: |
+          set -euo pipefail
+          tools/adopt.sh /tmp/fixture
+
+          # Named explicitly rather than counted: a count passes just as well
+          # when the wrong four files are present.
+          for f in R-CMD-check.yml pkgdown.yml test-coverage.yml link-check.yml; do
+            path="/tmp/fixture/.github/workflows/$f"
+            if [ ! -f "$path" ]; then
+              echo "::error::adopt.sh did not write $f"
+              exit 1
+            fi
+            if ! grep -q 'gojiplus/r-canon/.github/workflows/reusable-.*@v1' "$path"; then
+              echo "::error::$f does not reference r-canon@v1"
+              exit 1
+            fi
+            echo "ok: $f"
+          done
+
+      - name: drift.R passes a repo that is on the standard
+        run: |
+          set -euo pipefail
+          # adopt.sh just made this fixture conformant, so a non-zero exit here
+          # means the two tools disagree about what the standard is -- which is
+          # exactly the drift this repo exists to prevent, in the repo itself.
+          Rscript tools/drift.R /tmp/fixture
+
+      - name: drift.R fails a repo that is not
+        run: |
+          set -euo pipefail
+          rm /tmp/fixture/.github/workflows/link-check.yml
+          if Rscript tools/drift.R /tmp/fixture; then
+            echo "::error::drift.R reported a repo missing link-check.yml as clean"
+            exit 1
+          fi
+          echo "ok: drift.R still detects a missing shim"
+
+  # The one reusable workflow this repo can genuinely call on itself. A
+  # local-path `uses:` runs the branch's own copy, so this tests the change
+  # under review rather than whatever @v1 currently points at.
+  link-check:
+    name: link-check (self-call)
+    permissions:
+      contents: read
+    uses: ./.github/workflows/reusable-link-check.yml
+    with:
+      paths: |
+        README.md
+        STANDARD.md
+
+  gate:
+    name: gate
+    # The single context the branch ruleset requires. Jobs get added and
+    # renamed; a ruleset pinned to one aggregate does not have to be edited
+    # every time, and cannot be satisfied by a job that silently stopped
+    # running.
+    if: always()
+    needs: [actionlint, shellcheck, tools, link-check]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Assert no upstream job failed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          set -euo pipefail
+          echo "upstream results: $RESULTS"
+          for r in $RESULTS; do
+            case "$r" in
+              success|skipped) ;;
+              *) echo "::error::an upstream job reported '$r'"; exit 1 ;;
+            esac
+          done
+          echo "gate: green"
