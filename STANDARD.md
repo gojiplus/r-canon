@@ -16,8 +16,8 @@ what lives here.
 
 | | |
 |---|---|
-| CI | References the three reusable workflows below, pinned to `@v1` |
-| Workflow filenames | `R-CMD-check.yml`, `pkgdown.yml`, `test-coverage.yml` — exactly these |
+| CI | References the four reusable workflows below, pinned to `@v1` |
+| Workflow filenames | `R-CMD-check.yml`, `pkgdown.yml`, `test-coverage.yml`, `link-check.yml` — exactly these |
 | Checks on | Ubuntu release/devel/oldrel-1, macOS release, Windows release |
 | Check bar | `R CMD check --as-cran` clean; warnings fail the build |
 | Tests | `testthat`, edition 3, under `tests/testthat/` |
@@ -28,7 +28,7 @@ what lives here.
 
 ## Consuming it
 
-Three files, six lines each. Everything else lives here.
+Four files, six lines each. Everything else lives here.
 
 `.github/workflows/R-CMD-check.yml`:
 
@@ -87,6 +87,42 @@ jobs:
 The `secrets:` block is optional. Without a token, coverage is still computed,
 printed and kept as a build artifact; only the Codecov upload is skipped.
 
+`.github/workflows/link-check.yml`:
+
+```yaml
+name: link-check
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  links:
+    uses: gojiplus/r-canon/.github/workflows/reusable-link-check.yml@v1
+```
+
+The `permissions` block here does the opposite job to the one on `pkgdown`.
+That one *grants* write so a deploy can happen; this one *caps* the token at
+read. A called workflow can only narrow what its caller holds, so the caller is
+where the ceiling is set, and a repo whose default token is read-write would
+otherwise hand one to a job that only ever reads files.
+
+The `schedule` is not decorative either. External links rot without anyone
+committing, so a package that is finished — which is most of them — would never
+find out.
+
+This does not duplicate `urlchecker` or the URL step in `R CMD check --as-cran`.
+Both read R's own URL database, which collects link *targets* and never image
+sources, so a README badge is invisible to them. tubern's R-CMD-check badge
+pointed at a renamed workflow and returned 404 for months while `urlchecker`
+reported "All URLs are correct!" against the same tree. Keep using `urlchecker`
+for `\url{}` in `Rd` and for its redirect fixes; it answers a different question.
+
 ## Inputs, and why there are so few
 
 The check matrix is **not** an input. It is the five configurations CRAN runs,
@@ -102,6 +138,28 @@ The inputs that do exist cover the places packages legitimately differ:
 | check | `error-on` | Temporarily loosening to `"error"` while a warning is fixed. Say in a comment when it goes back |
 | check | `extra-packages` | A package whose checks need something beyond `rcmdcheck` |
 | pkgdown | `extra-packages` | Same, for the site build |
+| link-check | `paths` | A package whose prose lives somewhere other than the default set. One glob per line — a bare directory name matches nothing and still exits 0 |
+| link-check | `exclude` | URL regexes to skip. For service endpoints that appear in source as string constants: an API base URL answers 404 to an unauthenticated GET by design |
+
+## Action pinning
+
+Every `uses:` in these workflows names a commit SHA, with the human-readable
+version beside it in a comment:
+
+```yaml
+- uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+```
+
+A tag like `@v7` is a label its owner can repoint at any time, including an
+owner whose account has been taken over. Because the fleet runs these workflows
+rather than copying them, code swapped in behind such a tag would execute in
+every R repo at once, against their secrets, with no commit landing in any of
+them. A SHA names one immutable tree, so nothing changes underneath us.
+
+This is only safe because Dependabot is configured here for `github-actions`
+and rewrites both the SHA and its comment when a real release ships. Pinning
+without that automation is worse than floating tags: the pins never move and
+the fleet quietly runs unpatched actions forever.
 
 ## Versioning
 

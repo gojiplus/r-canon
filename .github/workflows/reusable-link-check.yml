@@ -1,0 +1,93 @@
+# The fleet's dead-link check.
+#
+# R has a link checker already -- `urlchecker`, and the URL step in
+# `R CMD check --as-cran` -- and neither one covers this. Both read R's own URL
+# database, which collects *link targets* and never image sources. A README
+# badge is an image, so a badge pointing at a workflow that has been renamed
+# stays 404 through a clean `R CMD check`. That is not hypothetical: tubern's
+# R-CMD-check badge was broken for months, and `urlchecker` reported "All URLs
+# are correct!" against the same tree because it saw 22 URLs and the badge was
+# not among them.
+#
+# So this runs lychee, which reads the files as text and finds every URL in
+# them, and it complements rather than replaces the R-native checks.
+
+name: reusable-link-check
+
+on:
+  workflow_call:
+    inputs:
+      paths:
+        description: >
+          Files to scan, one glob per line. These must be globs: `lychee docs/`
+          matches nothing, reports it as a warning rather than an error, and
+          exits 0 -- a bare directory name reads as a passing check over zero
+          links. The default covers what an R package ships.
+        required: false
+        type: string
+        default: |
+          README.md
+          NEWS.md
+          DESCRIPTION
+          vignettes/**/*.Rmd
+          R/**/*.R
+      exclude:
+        description: >
+          URL regexes to skip, one per line. For service endpoints that appear
+          in source as string constants rather than as documents -- an API base
+          URL answers 404 to an unauthenticated GET by design.
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Built here rather than interpolated into the action's `args` directly,
+      # so a glob containing a space survives as one argument.
+      - name: Assemble the lychee arguments
+        id: args
+        env:
+          PATHS: ${{ inputs.paths }}
+          EXCLUDE: ${{ inputs.exclude }}
+        run: |
+          set -euo pipefail
+          args=""
+          while IFS= read -r pattern; do
+            [ -n "$pattern" ] || continue
+            args="$args --exclude '$pattern'"
+          done <<< "$EXCLUDE"
+          while IFS= read -r path; do
+            [ -n "$path" ] || continue
+            args="$args '$path'"
+          done <<< "$PATHS"
+          printf 'value=%s\n' "$args" >> "$GITHUB_OUTPUT"
+
+      - name: Check links
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          # 429 is a rate limit, which says nothing about whether the link
+          # exists. Everything else outside 2xx fails, including 5xx: a server
+          # error that survives three retries is a signal, not noise. No
+          # --cache, because it writes .lycheecache into the repo root and
+          # every package would then need it in .gitignore *and* .Rbuildignore
+          # to keep it out of the tarball -- too much to impose fleet-wide for
+          # a couple of seconds on a few dozen URLs.
+          args: >-
+            --no-progress
+            --max-retries 3
+            --accept 200..=299,429
+            ${{ steps.args.outputs.value }}
+          fail: true
+          # A glob that goes stale stops matching silently. This will not catch
+          # one stale glob among several, but it does catch the case where the
+          # whole set stops matching and the job would otherwise report green
+          # over nothing.
+          failIfEmpty: true
+          jobSummary: true
