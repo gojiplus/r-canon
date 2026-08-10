@@ -7,7 +7,7 @@ that keep them on it without copy-paste.
 five platforms, testthat, roxygen2, pkgdown, semantic versions matching tags.
 Changing the fleet's mind is a pull request to that file.
 
-**The machinery:** three reusable workflows. Repos reference them in six lines;
+**The machinery:** four reusable workflows. Repos reference them in six lines;
 all the logic lives here, so a fix propagates on the next run.
 
 | Workflow | What it does |
@@ -15,6 +15,7 @@ all the logic lives here, so a fix propagates on the next run.
 | `reusable-check.yml` | `R CMD check` on Ubuntu release/devel/oldrel-1, macOS, Windows |
 | `reusable-pkgdown.yml` | Builds the site on every push and PR; deploys only from the default branch or a tag |
 | `reusable-coverage.yml` | Runs `covr`; uploads to Codecov when a token exists, keeps an artifact when it doesn't |
+| `reusable-link-check.yml` | Runs `lychee` over README, NEWS, DESCRIPTION, vignettes and `R/`, weekly as well as on push |
 
 ## Adopting a repo
 
@@ -22,11 +23,11 @@ all the logic lives here, so a fix propagates on the next run.
 tools/adopt.sh ~/Documents/GitHub/mypackage
 ```
 
-Writes the three shims, removes whatever CI was there before, and stages the
+Writes the four shims, removes whatever CI was there before, and stages the
 result without committing — look at the diff first, especially for a repo whose
 bespoke workflows are worth reading before they go.
 
-By hand it is three files:
+By hand it is four files:
 
 ```yaml
 # .github/workflows/R-CMD-check.yml
@@ -41,7 +42,7 @@ jobs:
     uses: gojiplus/r-canon/.github/workflows/reusable-check.yml@v1
 ```
 
-The other two are in [STANDARD.md](STANDARD.md).
+The other three are in [STANDARD.md](STANDARD.md).
 
 ## Checking for drift
 

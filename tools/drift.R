@@ -15,13 +15,15 @@ PIN <- "@v1"
 WANTED <- c(
   check = "R-CMD-check.yml",
   pkgdown = "pkgdown.yml",
-  coverage = "test-coverage.yml"
+  coverage = "test-coverage.yml",
+  links = "link-check.yml"
 )
 
 REUSABLE <- c(
   check = "reusable-check.yml",
   pkgdown = "reusable-pkgdown.yml",
-  coverage = "reusable-coverage.yml"
+  coverage = "reusable-coverage.yml",
+  links = "reusable-link-check.yml"
 )
 
 is_pkg <- function(path) {
@@ -75,6 +77,7 @@ audit <- function(path) {
     check = references(path, "check"),
     pkgdown = references(path, "pkgdown"),
     coverage = references(path, "coverage"),
+    links = references(path, "links"),
     testthat = dir.exists(file.path(path, "tests", "testthat")),
     # STANDARD.md requires edition 3, and until now nothing checked it. A package
     # can sit on edition 2 -- still using context() and expect_that(is_a()), both
@@ -84,7 +87,7 @@ audit <- function(path) {
       file.path(path, c("_pkgdown.yml", "_pkgdown.yaml")),
       file.path(path, "pkgdown", c("_pkgdown.yml", "_pkgdown.yaml"))
     )),
-    # Files beyond the three canonical ones are what a bespoke CI system looks
+    # Files beyond the four canonical ones are what a bespoke CI system looks
     # like from the outside.
     extra = setdiff(present, unname(WANTED))
   )
@@ -127,13 +130,13 @@ main <- function(args) {
 
   cat("\n")
   cat(pad("repo", 13), pad("version", 9), pad("tag", 10), pad("roxygen", 9),
-      pad("check", 10), pad("pkgdown", 10), pad("cover", 10),
+      pad("check", 10), pad("pkgdown", 10), pad("cover", 10), pad("links", 10),
       pad("tests", 6), pad("site", 6), "extra\n", sep = "")
-  cat(strrep("-", 108), "\n", sep = "")
+  cat(strrep("-", 118), "\n", sep = "")
 
   drifted <- character()
   for (r in rows) {
-    bad <- !all(c(r$check, r$pkgdown, r$coverage) == "ok") ||
+    bad <- !all(c(r$check, r$pkgdown, r$coverage, r$links) == "ok") ||
       !r$testthat || !r$pkgdown_cfg || length(r$extra) > 0 ||
       !identical(ed(r$testthat, r$edition), "ed3")
     if (bad) drifted <- c(drifted, r$repo)
@@ -146,6 +149,7 @@ main <- function(args) {
       pad(mark(r$check), 10),
       pad(mark(r$pkgdown), 10),
       pad(mark(r$coverage), 10),
+      pad(mark(r$links), 10),
       pad(ed(r$testthat, r$edition), 6),
       pad(yn(r$pkgdown_cfg), 6),
       if (length(r$extra)) paste(r$extra, collapse = " ") else "-",

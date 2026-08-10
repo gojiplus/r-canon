@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Put a repo on the standard: write the three shims, remove whatever CI was
+# Put a repo on the standard: write the four shims, remove whatever CI was
 # there before.
 #
 #   tools/adopt.sh ~/Documents/GitHub/bloomjoin
@@ -91,6 +91,25 @@ jobs:
     uses: $CANON/.github/workflows/reusable-coverage.yml@$REF
     secrets:
       CODECOV_TOKEN: \${{ secrets.CODECOV_TOKEN }}
+YAML
+
+  cat > "$wf/link-check.yml" <<YAML
+name: link-check
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  # External links rot without a commit to trigger a rerun, so a dormant repo
+  # would otherwise never find out.
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  links:
+    uses: $CANON/.github/workflows/reusable-link-check.yml@$REF
 YAML
 
   git -C "$repo" add -A .github/workflows >/dev/null 2>&1 || true
