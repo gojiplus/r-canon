@@ -1,0 +1,65 @@
+# The fleet's lint gate, in two steps.
+#
+# First, that the repo's .lintr is identical to the canonical one at the root
+# of this repo. lintr reads its own config file and nothing can make it read a
+# remote one, so unlike the workflows the config is materialized into every
+# repo — and a materialized file drifts. This diff is the compensating
+# control: a repo cannot quietly soften its lint config and stay green.
+#
+# Second, lintr itself, which needs the package's dependencies installed
+# because the default linters include object_usage_linter.
+#
+# No inputs, like the check matrix: a repo that needs a different lint config
+# needs a conversation, not a knob.
+
+name: reusable-lint
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: gojiplus/r-canon
+          ref: v1
+          path: .r-canon
+          persist-credentials: false
+
+      - name: .lintr matches the canon
+        run: |
+          set -euo pipefail
+          if [ ! -f .lintr ]; then
+            echo "::error::no .lintr here. The standard's config is canonical; tools/adopt.sh in gojiplus/r-canon writes it."
+            exit 1
+          fi
+          if ! diff -u .r-canon/.lintr .lintr; then
+            echo "::error::.lintr differs from the canonical one in gojiplus/r-canon. Changing the fleet's mind is a PR there, not an edit here."
+            exit 1
+          fi
+          # Gone before lintr runs, or its R sources would be linted too.
+          rm -rf .r-canon
+
+      - uses: r-lib/actions/setup-r@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
+        with:
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
+        with:
+          extra-packages: any::lintr, local::.
+          needs: lint
+
+      - name: lintr
+        run: |
+          lints <- lintr::lint_package()
+          print(lints)
+          quit(status = as.integer(length(lints) > 0))
+        shell: Rscript {0}

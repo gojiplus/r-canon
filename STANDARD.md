@@ -16,19 +16,21 @@ what lives here.
 
 | | |
 |---|---|
-| CI | References the four reusable workflows below, pinned to `@v1` |
-| Workflow filenames | `R-CMD-check.yml`, `pkgdown.yml`, `test-coverage.yml`, `link-check.yml` — exactly these |
+| CI | References the five reusable workflows below, pinned to `@v1` |
+| Workflow filenames | `R-CMD-check.yml`, `pkgdown.yml`, `test-coverage.yml`, `link-check.yml`, `lint.yml` — exactly these |
 | Checks on | Ubuntu release/devel/oldrel-1, macOS release, Windows release |
 | Check bar | `R CMD check --as-cran` clean; warnings fail the build |
 | Tests | `testthat`, edition 3, under `tests/testthat/` |
+| Lint | The canonical `.lintr` from this repo, byte-identical, enforced in CI by `lint.yml` — never in the test suite |
 | Docs | roxygen2, and a `pkgdown` site deployed to `gh-pages` |
-| Version | Semantic, in `DESCRIPTION`, matching a `v`-prefixed git tag |
+| Version | Semantic, in `DESCRIPTION`, matching a `v`-prefixed git tag; `.9xxx` dev versions between releases |
 | License | Declared in `DESCRIPTION` with a `LICENSE` file |
-| News | `NEWS.md`, newest first, one section per released version |
+| News | `NEWS.md`, newest first, one section per released version, a `(development version)` header on top between releases |
 
 ## Consuming it
 
-Four files, six lines each. Everything else lives here.
+Five workflow files, a few lines each, plus one copied `.lintr`. Everything
+else lives here.
 
 `.github/workflows/R-CMD-check.yml`:
 
@@ -87,6 +89,22 @@ jobs:
 The `secrets:` block is optional. Without a token, coverage is still computed,
 printed and kept as a build artifact; only the Codecov upload is skipped.
 
+`.github/workflows/lint.yml`:
+
+```yaml
+name: lint
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+permissions:
+  contents: read
+jobs:
+  lint:
+    uses: gojiplus/r-canon/.github/workflows/reusable-lint.yml@v1
+```
+
 `.github/workflows/link-check.yml`:
 
 ```yaml
@@ -123,12 +141,49 @@ pointed at a renamed workflow and returned 404 for months while `urlchecker`
 reported "All URLs are correct!" against the same tree. Keep using `urlchecker`
 for `\url{}` in `Rd` and for its redirect fixes; it answers a different question.
 
+## Lint and style
+
+The config is one canonical `.lintr`, at the root of this repo. It is lintr's
+tidyverse defaults with exactly two deviations, both measured from the fleet
+rather than invented:
+
+- **`line_length_linter(100L)`.** Three fleet configs had already chosen 100,
+  and two more disabled the linter entirely rather than live with 80. 100 is
+  the strictest bound the fleet has ever voluntarily held.
+- **`object_name_linter` admits `dotted.case` beside `snake_case`.** Exported
+  names in the older packages cannot be snake_cased without breaking their
+  users' code, and one repo had already encoded exactly this compromise. The
+  alternative was what three repos actually did: disable the linter outright.
+
+Everything else stays at the defaults — including the trailing-whitespace,
+indentation and return linters that four repos had switched off. Those are a
+one-time `styler::style_pkg()` cost, not an ongoing one, and `styler` with
+tidyverse defaults is the prescribed fixer for exactly that reason. It is not
+CI-enforced this round: lintr gates the load-bearing issues, and a formatter
+check is a second, sometimes-disagreeing authority.
+
+Unlike the workflows, the config is **materialized**: lintr reads its own file
+and nothing can make it read a remote one, so every repo carries a copy and a
+copy drifts. Two controls compensate. `reusable-lint.yml` diffs the repo's
+`.lintr` against this repo's on every run, so a locally softened config goes
+red the next push; and `drift.R` audits the same thing across checkouts. This
+is the one place the "a copied file would just be drift" rule below bends —
+with the diff as the guard, the copy cannot drift silently.
+
+Lint runs in CI and **never in the test suite**. A
+`tests/testthat/test-pkg-style.R` calling `lintr::expect_lint_free()` — four
+fleet repos had one — is drift: lintr itself skips `expect_lint_free()` on
+CRAN, so the test is dead weight exactly where tests matter, and everywhere
+else it makes other machines' lintr versions into style oracles for
+`R CMD check`. `adopt.sh` deletes the file; `drift.R` fails a repo that has
+one. lintr does not need to sit in `Suggests` for CI to run it.
+
 ## Inputs, and why there are so few
 
 The check matrix is **not** an input. It is the five configurations CRAN runs,
 and a package needing a different set needs a conversation rather than a knob —
 a standard you can configure your way out of is not a standard. Drift re-enters
-through options.
+through options. The lint workflow has no inputs at all, for the same reason.
 
 The inputs that do exist cover the places packages legitimately differ:
 
@@ -178,9 +233,15 @@ if any has drifted:
 Rscript tools/drift.R ~/Documents/GitHub
 ```
 
-It reports whether each repo references `@v1`, uses the canonical filenames, has
-`testthat` at **edition 3** and `pkgdown`, and whether its `DESCRIPTION` version
-matches its latest tag.
+It reports whether each repo references `@v1`, uses the canonical filenames,
+carries the canonical `.lintr` unmodified, has `testthat` at **edition 3**,
+`pkgdown`, a `LICENSE` and a `NEWS.md`, keeps lint out of the test suite, and
+whether its `DESCRIPTION` version matches its latest tag — exactly, or as a
+`.9xxx` dev version on top of it. A repo with no tags at all is pre-release,
+not drifted. Leftover `CRAN-SUBMISSION`/`CRAN-RELEASE` files are noted without
+failing, since a submission legitimately carries one while it is pending.
+`rhub.yaml` is a sanctioned extra workflow: `rhub::rhub_setup()` writes it and
+the release process depends on it.
 
 The edition check earns its place: the table above has always required edition 3,
 and nothing verified it. A package can sit on edition 2 — still calling
@@ -200,4 +261,6 @@ the whole failure mode this repo exists to prevent.
   repo here.
 - **Shared roxygen or pkgdown config.** There is no import mechanism for these
   the way `py_canon.sphinx` works for Sphinx, and faking one with a copied file
-  would just be drift again.
+  would just be drift again. (The `.lintr` is the deliberate exception: it too
+  is a copy, but the lint workflow diffs it against canon on every run, which
+  a roxygen or pkgdown config has no equivalent of.)

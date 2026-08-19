@@ -10,6 +10,19 @@ advanced by `major-tag.yml` after a release is cut, not a release of its own.
 
 ### Added
 
+- A lint standard. One canonical `.lintr` — tidyverse defaults, 100-character
+  lines, `dotted.case` admitted beside `snake_case`, both deviations measured
+  from the fleet — materialized into each repo by `adopt.sh` and enforced by a
+  fifth reusable workflow, `reusable-lint.yml`, which first diffs the repo's
+  copy against canon and then runs `lintr::lint_package()`. Style tests in the
+  test suite (`test-pkg-style.R` / `expect_lint_free()`) are now drift:
+  `adopt.sh` deletes them and `drift.R` fails a repo that has one.
+- `drift.R` now audits everything STANDARD.md claims: the `.lintr` copy,
+  LICENSE and NEWS.md presence, lint kept out of the test suite, and the
+  DESCRIPTION-version-versus-tag rule (with a `.9xxx` dev-version carve-out)
+  as a failure rather than a note. `rhub.yaml` becomes a sanctioned extra
+  workflow; stale `CRAN-SUBMISSION`/`CRAN-RELEASE` files are noted.
+
 - A `LICENSE` file. The standard has always required one of every package it
   governs; the repo that states the requirement now meets it.
 - This changelog. Changing the fleet's mind was already a pull request to

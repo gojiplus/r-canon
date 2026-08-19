@@ -7,8 +7,8 @@ that keep them on it without copy-paste.
 five platforms, testthat, roxygen2, pkgdown, semantic versions matching tags.
 Changing the fleet's mind is a pull request to that file.
 
-**The machinery:** four reusable workflows. Repos reference them in six lines;
-all the logic lives here, so a fix propagates on the next run.
+**The machinery:** five reusable workflows. Repos reference them in a few
+lines; all the logic lives here, so a fix propagates on the next run.
 
 | Workflow | What it does |
 |---|---|
@@ -16,6 +16,7 @@ all the logic lives here, so a fix propagates on the next run.
 | `reusable-pkgdown.yml` | Builds the site on every push and PR; deploys only from the default branch or a tag |
 | `reusable-coverage.yml` | Runs `covr`; uploads to Codecov when a token exists, keeps an artifact when it doesn't |
 | `reusable-link-check.yml` | Runs `lychee` over README, NEWS, DESCRIPTION, vignettes and `R/`, weekly as well as on push |
+| `reusable-lint.yml` | Checks the repo's `.lintr` is the canonical one, then runs `lintr` |
 
 ## Adopting a repo
 
@@ -23,11 +24,12 @@ all the logic lives here, so a fix propagates on the next run.
 tools/adopt.sh ~/Documents/GitHub/mypackage
 ```
 
-Writes the four shims, removes whatever CI was there before, and stages the
-result without committing — look at the diff first, especially for a repo whose
-bespoke workflows are worth reading before they go.
+Writes the five shims and the canonical `.lintr`, removes whatever CI was
+there before along with any `test-pkg-style.R` (lint lives in CI, not the test
+suite), and stages the result without committing — look at the diff first,
+especially for a repo whose bespoke workflows are worth reading before they go.
 
-By hand it is four files:
+By hand it is five files plus the copied `.lintr`:
 
 ```yaml
 # .github/workflows/R-CMD-check.yml
@@ -42,7 +44,7 @@ jobs:
     uses: gojiplus/r-canon/.github/workflows/reusable-check.yml@v1
 ```
 
-The other three are in [STANDARD.md](STANDARD.md).
+The other four are in [STANDARD.md](STANDARD.md).
 
 ## Checking for drift
 
@@ -51,8 +53,10 @@ Rscript tools/drift.R ~/Documents/GitHub
 ```
 
 Audits every R package under a directory and exits non-zero if any has drifted —
-wrong workflow filenames, unpinned or missing references, no testthat, no
-pkgdown config, or leftover bespoke workflows.
+wrong workflow filenames, unpinned or missing references, a modified `.lintr`,
+lint in the test suite, no testthat edition 3, no pkgdown config, no LICENSE or
+NEWS.md, a DESCRIPTION version that matches no tag, or leftover bespoke
+workflows.
 
 ## Why this is smaller than py-canon
 
