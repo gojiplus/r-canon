@@ -39,6 +39,18 @@ on:
         required: false
         type: string
         default: "any::rcmdcheck"
+      not-cran:
+        description: >
+          Set NOT_CRAN=true so testthat's skip_on_cran() tests actually run.
+          Neither r-lib/actions/check-r-package nor rcmdcheck sets it, and
+          covr does not either -- checked, not assumed -- so by default every
+          skip_on_cran() test in the fleet runs nowhere at all. Across six
+          packages that was 72 call sites. Default false because turning it
+          on can redden a repo whose skipped tests were quietly failing;
+          turn it on per repo, once, and read what it finds.
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -61,6 +73,7 @@ jobs:
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       R_KEEP_PKG_SOURCE: yes
+      NOT_CRAN: ${{ inputs.not-cran }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
