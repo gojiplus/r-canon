@@ -8,6 +8,25 @@ advanced by `major-tag.yml` after a release is cut, not a release of its own.
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-08-19
+
+### Added
+
+- A `not-cran` input on the check and coverage workflows, off by default.
+  `skip_on_cran()` runs a test only when `NOT_CRAN` is `"true"`, and nothing
+  in the fleet's CI sets it — not `r-lib/actions/check-r-package`, not
+  `rcmdcheck`, not `covr`, each verified rather than assumed. That is 72
+  `skip_on_cran()` call sites across six packages whose tests run nowhere at
+  all. Off by default because turning it on can redden a repo whose skipped
+  tests were quietly failing; that is worth finding out one repo at a time.
+
+### Fixed
+
+- The canonical `.lintr` admits `SNAKE_CASE`, for package constants. `guess`
+  keeps 33 of them in one file and could not fix it locally, since the lint
+  workflow enforces the config byte-identical. Second fix the rollout has
+  sent back to the standard.
+
 ## [1.2.1] - 2026-08-19
 
 ### Fixed

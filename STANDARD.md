@@ -150,10 +150,13 @@ rather than invented:
 - **`line_length_linter(100L)`.** Three fleet configs had already chosen 100,
   and two more disabled the linter entirely rather than live with 80. 100 is
   the strictest bound the fleet has ever voluntarily held.
-- **`object_name_linter` admits `dotted.case` beside `snake_case`.** Exported
-  names in the older packages cannot be snake_cased without breaking their
-  users' code, and one repo had already encoded exactly this compromise. The
-  alternative was what three repos actually did: disable the linter outright.
+- **`object_name_linter` admits `dotted.case` and `SNAKE_CASE` beside
+  `snake_case`.** Exported names in the older packages cannot be snake_cased
+  without breaking their users' code, and one repo had already encoded exactly
+  this compromise; the alternative was what three repos actually did, which
+  was to disable the linter outright. `SNAKE_CASE` covers package constants —
+  `guess` keeps 33 of them in one file, and there is no version of "rename
+  `VALID_RESPONSE_VALUES`" that improves that code.
 
 Two paths are excluded because nobody writes them by hand: `R/RcppExports.R`
 (Rcpp generates it) and `tests/testthat/_fixtures` (where `httptest2` records
@@ -197,6 +200,8 @@ The inputs that do exist cover the places packages legitimately differ:
 | check | `build-args` | A package with no vignettes can drop `--compact-vignettes` and its ghostscript dependency |
 | check | `error-on` | Temporarily loosening to `"error"` while a warning is fixed. Say in a comment when it goes back |
 | check | `extra-packages` | A package whose checks need something beyond `rcmdcheck` |
+| check | `not-cran` | Run the `skip_on_cran()` tests. Off by default; see below |
+| coverage | `not-cran` | The same, so coverage does not under-report what those tests cover |
 | pkgdown | `extra-packages` | Same, for the site build |
 | link-check | `paths` | A package whose prose lives somewhere other than the default set. One glob per line — a bare directory name matches nothing and still exits 0 |
 | link-check | `exclude` | URL regexes to skip. For service endpoints that appear in source as string constants: an API base URL answers 404 to an unauthenticated GET by design |
@@ -254,6 +259,26 @@ and nothing verified it. A package can sit on edition 2 — still calling
 Three repos were doing exactly that when the check was added. A rule the standard
 states but does not audit is a rule the fleet drifts away from silently, which is
 the whole failure mode this repo exists to prevent.
+
+## skip_on_cran, and where those tests actually run
+
+Nowhere, by default. `skip_on_cran()` runs a test only when `NOT_CRAN` is
+`"true"`, and nothing in the fleet's CI sets it: not
+`r-lib/actions/check-r-package`, not `rcmdcheck`, and not `covr` either —
+each checked rather than assumed. Across six packages that is 72
+`skip_on_cran()` call sites whose tests have never run anywhere, and only
+`guess` noticed, which is why it carries a bespoke Monte Carlo workflow.
+
+The `not-cran` input on the check and coverage workflows turns them on. It
+defaults to **false**, because switching it on can redden a repo whose
+skipped tests were quietly failing — and finding that out one repo at a time,
+deliberately, is the point. Turn it on per repo, read what it finds, then
+leave it on.
+
+The default is not a recommendation. A `skip_on_cran()` test that runs
+nowhere is a test you are not running, and a suite that reports `PASS` while
+silently skipping its only evidence of correctness is worse than no suite,
+because it is trusted.
 
 ## Releasing to CRAN
 

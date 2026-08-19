@@ -9,6 +9,17 @@ name: reusable-coverage
 
 on:
   workflow_call:
+    inputs:
+      not-cran:
+        description: >
+          Set NOT_CRAN=true so skip_on_cran() tests run here too. covr does
+          not set it either, so a repo that turns this on in the check
+          workflow but not here gets coverage that under-reports whatever
+          those tests cover. Same default and same reasoning as the check
+          workflow's input.
+        required: false
+        type: boolean
+        default: false
     secrets:
       CODECOV_TOKEN:
         description: >
@@ -29,6 +40,7 @@ jobs:
       # own `env` is not available to its own `if` either. Resolving it once at
       # job level is the only scope where both work.
       HAS_CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN != '' }}
+      NOT_CRAN: ${{ inputs.not-cran }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
