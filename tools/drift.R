@@ -9,22 +9,50 @@
 # containing a DESCRIPTION with a Package: field is audited. Exits 1 if any repo
 # has drifted, so this can gate CI later.
 
-CANON <- "gojiplus/r-canon"
-PIN <- "@v1"
+canon_repo <- "gojiplus/r-canon"
+pin <- "@v1"
 
-WANTED <- c(
+wanted <- c(
   check = "R-CMD-check.yml",
   pkgdown = "pkgdown.yml",
   coverage = "test-coverage.yml",
-  links = "link-check.yml"
+  links = "link-check.yml",
+  lint = "lint.yml"
 )
 
-REUSABLE <- c(
+reusable <- c(
   check = "reusable-check.yml",
   pkgdown = "reusable-pkgdown.yml",
   coverage = "reusable-coverage.yml",
-  links = "reusable-link-check.yml"
+  links = "reusable-link-check.yml",
+  lint = "reusable-lint.yml"
 )
+
+# Workflow files beyond the shims that are not drift. rhub.yaml is written by
+# rhub::rhub_setup(), and the release checklist in STANDARD.md uses R-hub v2,
+# so forbidding it would ban the standard's own release process.
+allowed_extra <- c("rhub.yaml", "rhub.yml")
+
+# The canonical .lintr travels with this script: tools/drift.R sits one level
+# below the repo root that holds it. Fail loudly if it cannot be found -- a
+# conformance check against nothing would pass everything.
+canon_lintr_path <- function() {
+  arg <- grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)
+  if (!length(arg)) stop("cannot locate drift.R itself; run via Rscript")
+  root <- dirname(dirname(normalizePath(sub("^--file=", "", arg[1]))))
+  f <- file.path(root, ".lintr")
+  if (!file.exists(f)) stop("no canonical .lintr beside drift.R at ", f)
+  f
+}
+
+# Trailing whitespace is not a difference of opinion about lint config.
+read_clean <- function(f) sub("[ \t]+$", "", readLines(f, warn = FALSE))
+
+lintr_status <- function(path, canon) {
+  f <- file.path(path, ".lintr")
+  if (!file.exists(f)) return("missing")
+  if (identical(read_clean(f), read_clean(canon))) "ok" else "diverged"
+}
 
 is_pkg <- function(path) {
   d <- file.path(path, "DESCRIPTION")
@@ -48,16 +76,25 @@ git <- function(path, args) {
 
 # Does this repo reference the given reusable workflow, pinned to @v1?
 references <- function(path, kind) {
-  f <- file.path(path, ".github", "workflows", WANTED[[kind]])
+  f <- file.path(path, ".github", "workflows", wanted[[kind]])
   if (!file.exists(f)) return("missing")
   txt <- paste(readLines(f, warn = FALSE), collapse = "\n")
-  want <- paste0(CANON, "/.github/workflows/", REUSABLE[[kind]])
+  want <- paste0(canon_repo, "/.github/workflows/", reusable[[kind]])
   if (!grepl(want, txt, fixed = TRUE)) return("not-canon")
-  if (!grepl(paste0(want, PIN), txt, fixed = TRUE)) return("unpinned")
+  if (!grepl(paste0(want, pin), txt, fixed = TRUE)) return("unpinned")
   "ok"
 }
 
-audit <- function(path) {
+# The version rule: DESCRIPTION matches the latest v-prefixed tag, or is the
+# tag's version with a .9xxx development suffix (what use_dev_version() writes
+# between releases). A repo with no tags at all is pre-release, not drifted.
+version_ok <- function(version, tag) {
+  if (is.na(tag) || is.na(version)) return(TRUE)
+  if (identical(paste0("v", version), tag)) return(TRUE)
+  startsWith(version, paste0(sub("^v", "", tag), ".9"))
+}
+
+audit <- function(path, canon_lintr) {
   wf_dir <- file.path(path, ".github", "workflows")
   present <- if (dir.exists(wf_dir)) basename(list.files(wf_dir, "\\.ya?ml$")) else character()
 
@@ -78,6 +115,8 @@ audit <- function(path) {
     pkgdown = references(path, "pkgdown"),
     coverage = references(path, "coverage"),
     links = references(path, "links"),
+    lint = references(path, "lint"),
+    lintr_cfg = lintr_status(path, canon_lintr),
     testthat = dir.exists(file.path(path, "tests", "testthat")),
     # STANDARD.md requires edition 3, and until now nothing checked it. A package
     # can sit on edition 2 -- still using context() and expect_that(is_a()), both
@@ -87,9 +126,21 @@ audit <- function(path) {
       file.path(path, c("_pkgdown.yml", "_pkgdown.yaml")),
       file.path(path, "pkgdown", c("_pkgdown.yml", "_pkgdown.yaml"))
     )),
-    # Files beyond the four canonical ones are what a bespoke CI system looks
+    license = any(file.exists(file.path(path, c("LICENSE", "LICENSE.md")))),
+    news = file.exists(file.path(path, "NEWS.md")),
+    # Lint runs in CI, never the test suite: lintr skips expect_lint_free() on
+    # CRAN, and elsewhere the test makes other machines' lintr versions into
+    # style oracles for R CMD check.
+    style_test = file.exists(file.path(path, "tests", "testthat", "test-pkg-style.R")),
+    # Submission records should not outlive the release they record.
+    stale_submission = Filter(
+      function(f) file.exists(file.path(path, f)),
+      c("CRAN-SUBMISSION", "CRAN-RELEASE")
+    ),
+    version_ok = version_ok(version, tag),
+    # Files beyond the five canonical ones are what a bespoke CI system looks
     # like from the outside.
-    extra = setdiff(present, unname(WANTED))
+    extra = setdiff(present, c(unname(wanted), allowed_extra))
   )
 }
 
@@ -97,6 +148,7 @@ pad <- function(x, n) formatC(x, width = -n, flag = " ")
 
 main <- function(args) {
   if (!length(args)) args <- "."
+  canon_lintr <- canon_lintr_path()
 
   paths <- character()
   for (a in args) {
@@ -119,7 +171,7 @@ main <- function(args) {
     return(invisible(1L))
   }
 
-  rows <- lapply(paths, audit)
+  rows <- lapply(paths, audit, canon_lintr = canon_lintr)
 
   mark <- function(v) if (identical(v, "ok")) "ok" else v
   yn <- function(v) if (isTRUE(v)) "yes" else "NO"
@@ -131,14 +183,18 @@ main <- function(args) {
   cat("\n")
   cat(pad("repo", 13), pad("version", 9), pad("tag", 10), pad("roxygen", 9),
       pad("check", 10), pad("pkgdown", 10), pad("cover", 10), pad("links", 10),
-      pad("tests", 6), pad("site", 6), "extra\n", sep = "")
-  cat(strrep("-", 118), "\n", sep = "")
+      pad("lint", 10), pad(".lintr", 9), pad("tests", 6), pad("site", 6),
+      "extra\n", sep = "")
+  cat(strrep("-", 130), "\n", sep = "")
 
   drifted <- character()
   for (r in rows) {
-    bad <- !all(c(r$check, r$pkgdown, r$coverage, r$links) == "ok") ||
+    shims <- c(r$check, r$pkgdown, r$coverage, r$links, r$lint)
+    bad <- !all(shims == "ok") ||
+      !identical(r$lintr_cfg, "ok") ||
       !r$testthat || !r$pkgdown_cfg || length(r$extra) > 0 ||
-      !identical(ed(r$testthat, r$edition), "ed3")
+      !identical(ed(r$testthat, r$edition), "ed3") ||
+      !r$license || !r$news || r$style_test || !r$version_ok
     if (bad) drifted <- c(drifted, r$repo)
 
     cat(
@@ -150,6 +206,8 @@ main <- function(args) {
       pad(mark(r$pkgdown), 10),
       pad(mark(r$coverage), 10),
       pad(mark(r$links), 10),
+      pad(mark(r$lint), 10),
+      pad(mark(r$lintr_cfg), 9),
       pad(ed(r$testthat, r$edition), 6),
       pad(yn(r$pkgdown_cfg), 6),
       if (length(r$extra)) paste(r$extra, collapse = " ") else "-",
@@ -157,12 +215,19 @@ main <- function(args) {
       sep = ""
     )
 
-    # A version that does not match the latest tag is worth seeing but is not
-    # drift from the standard -- it usually just means unreleased work.
-    if (!is.na(r$version) && !is.na(r$tag) &&
-        !identical(paste0("v", r$version), r$tag)) {
-      cat(pad("", 13), "note: DESCRIPTION ", r$version,
-          " but latest tag ", r$tag, "\n", sep = "")
+    note <- function(...) cat(pad("", 13), ..., "\n", sep = "")
+    if (!r$version_ok) {
+      note("DRIFT: DESCRIPTION ", r$version, " but latest tag ", r$tag,
+           " (release the version or bump to a .9xxx dev version)")
+    }
+    if (!r$license) note("DRIFT: no LICENSE file")
+    if (!r$news) note("DRIFT: no NEWS.md")
+    if (r$style_test) {
+      note("DRIFT: tests/testthat/test-pkg-style.R -- lint belongs in CI, not the test suite")
+    }
+    if (length(r$stale_submission)) {
+      note("note: ", paste(r$stale_submission, collapse = " and "),
+           " present -- submission records should not outlive the release")
     }
   }
 

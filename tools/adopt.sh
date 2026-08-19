@@ -1,18 +1,22 @@
 #!/usr/bin/env bash
-# Put a repo on the standard: write the four shims, remove whatever CI was
-# there before.
+# Put a repo on the standard: write the five shims and the canonical .lintr,
+# remove whatever CI was there before.
 #
 #   tools/adopt.sh ~/Documents/GitHub/bloomjoin
 #   tools/adopt.sh ~/Documents/GitHub/{bloomjoin,dann,tubern}
 #
 # Writes files and stages the deletions. It does not commit or push -- look at
 # the diff first, especially for a repo that had bespoke workflows worth
-# reading before they go.
+# reading before they go. Removals are deliberate, with no keep-list: extra
+# workflows are what drift looks like from the outside, and the one legitimate
+# counterexample so far (a repo's own statistical-tests workflow) is a call the
+# human makes at the diff, which is exactly where this script sends them.
 
 set -euo pipefail
 
 CANON="gojiplus/r-canon"
 REF="v1"
+CANON_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 if [ $# -eq 0 ]; then
   echo "usage: $(basename "$0") <repo-dir> [repo-dir ...]" >&2
@@ -93,6 +97,23 @@ jobs:
       CODECOV_TOKEN: \${{ secrets.CODECOV_TOKEN }}
 YAML
 
+  cat > "$wf/lint.yml" <<YAML
+name: lint
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    uses: $CANON/.github/workflows/reusable-lint.yml@$REF
+YAML
+
   cat > "$wf/link-check.yml" <<YAML
 name: link-check
 
@@ -118,7 +139,26 @@ jobs:
     uses: $CANON/.github/workflows/reusable-link-check.yml@$REF
 YAML
 
-  git -C "$repo" add -A .github/workflows >/dev/null 2>&1 || true
+  # The lint config is materialized, not referenced -- lintr only reads its
+  # own file. The canonical copy always wins; reusable-lint.yml diffs it
+  # against canon on every run, so a softened local copy would fail there
+  # anyway.
+  if [ -f "$repo/.lintr" ] && ! cmp -s "$CANON_DIR/.lintr" "$repo/.lintr"; then
+    echo "$name: replacing existing .lintr with the canonical one"
+  fi
+  cp "$CANON_DIR/.lintr" "$repo/.lintr"
+
+  # Lint runs in CI, never in the test suite: lintr skips expect_lint_free()
+  # on CRAN, and everywhere else the test makes other machines' lintr versions
+  # into style oracles for R CMD check.
+  style_test="$repo/tests/testthat/test-pkg-style.R"
+  if [ -f "$style_test" ]; then
+    echo "$name: removing tests/testthat/test-pkg-style.R (lint lives in CI now)"
+    rm -f "$style_test"
+    git -C "$repo" add -A tests/testthat/test-pkg-style.R >/dev/null 2>&1 || true
+  fi
+
+  git -C "$repo" add -A .github/workflows .lintr >/dev/null 2>&1 || true
   echo "$name: on $CANON@$REF"
 
   if [ ! -f "$repo/_pkgdown.yml" ] && [ ! -f "$repo/_pkgdown.yaml" ] &&

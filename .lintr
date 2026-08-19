@@ -1,0 +1,7 @@
+linters: linters_with_defaults(
+    line_length_linter(100L),
+    object_name_linter(styles = c("snake_case", "dotted.case"))
+  )
+exclusions: list(
+    "R/RcppExports.R"
+  )
