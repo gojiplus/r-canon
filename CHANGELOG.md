@@ -8,6 +8,8 @@ advanced by `major-tag.yml` after a release is cut, not a release of its own.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-08-19
+
 ### Added
 
 - A lint standard. One canonical `.lintr` — tidyverse defaults, 100-character
