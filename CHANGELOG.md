@@ -17,6 +17,19 @@ advanced by `major-tag.yml` after a release is cut, not a release of its own.
   copy against canon and then runs `lintr::lint_package()`. Style tests in the
   test suite (`test-pkg-style.R` / `expect_lint_free()`) are now drift:
   `adopt.sh` deletes them and `drift.R` fails a repo that has one.
+- A "Releasing to CRAN" section in STANDARD.md. The checklist itself is
+  `usethis::use_release_issue()` — usethis wins on any disagreement — and the
+  section records only the fleet's additions: the link-check/urlchecker split,
+  R-hub v2 via `rhub.yaml`, the revdep step, why the spelling test is allowed
+  in the suite while the lint test is banned, submission-file hygiene, and the
+  post-release dev-version bump the drift audit's `.9xxx` carve-out encodes.
+- `FLEET` (seven `org/repo` lines; an entry means monitored, not conforming)
+  and `docs/fleet-inventory.md`, a census taken before rolling the lint
+  standard out: CRAN status maintainer-verified per package, per-repo drift
+  from an actual `drift.R` run, and the out-of-scope list with reasons
+  (aws.alexa dead, dann hands-off and CRAN-name-blocked, distortions a
+  research repo). A weekly non-gating `fleet-drift` job in `ci.yml` clones
+  `FLEET` and writes the audit table to the step summary.
 - `drift.R` now audits everything STANDARD.md claims: the `.lintr` copy,
   LICENSE and NEWS.md presence, lint kept out of the test suite, and the
   DESCRIPTION-version-versus-tag rule (with a `.9xxx` dev-version carve-out)

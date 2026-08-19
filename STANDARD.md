@@ -250,6 +250,48 @@ Three repos were doing exactly that when the check was added. A rule the standar
 states but does not audit is a rule the fleet drifts away from silently, which is
 the whole failure mode this repo exists to prevent.
 
+## Releasing to CRAN
+
+The checklist is `usethis::use_release_issue()`. It is maintained by the
+people who maintain the release tooling itself, so this section does not
+restate it — it records only what the fleet adds or interprets. Where the two
+disagree, usethis wins and this section gets a PR.
+
+**Before submitting**, the usethis items plus fleet notes:
+
+- `urlchecker::url_check()` — and keep the link-check workflow's weekly run
+  beside it; they answer different questions (see above: R's URL database
+  never sees a README badge).
+- `devtools::check(remote = TRUE, manual = TRUE)`, then
+  `devtools::check_win_devel()`. For anything beyond a patch,
+  `rhub::rhub_setup()` + `rhub::rhub_check()` — R-hub v2 runs in the
+  package's own repo, which is why `rhub.yaml` is a sanctioned extra
+  workflow rather than drift.
+- Reverse dependencies: `devtools::revdep()` first — most fleet packages
+  have none, and the answer decides whether
+  `revdepcheck::revdep_check(num_workers = 4)` is a step or a no-op. Keep
+  `revdep/` out of git and out of the tarball.
+- Spelling: `usethis::use_spell_check()` gives `spelling` in Suggests,
+  `Language:` in DESCRIPTION, `inst/WORDLIST`, and a `tests/spelling.R`.
+  That test is allowed in the suite while the lint test is banned because it
+  is non-erroring by convention and WORDLIST is content, not style — a CRAN
+  machine's dictionary version cannot fail your build.
+- `cran-comments.md` (from `usethis::use_cran_comments()`): test
+  environments, `0 errors | 0 warnings | N notes` with every NOTE explained,
+  and a reverse-dependency line even when it is "there are none".
+
+**Submission and after:**
+
+- `devtools::submit_cran()` writes `CRAN-SUBMISSION`; it lives in the repo
+  exactly as long as the submission is pending. On acceptance,
+  `usethis::use_github_release()` consumes and deletes it. Neither it nor
+  the legacy `CRAN-RELEASE` survives a release — `drift.R` notes stragglers.
+- Tag `vX.Y.Z` (the version rule above), then
+  `usethis::use_dev_version(push = TRUE)`: DESCRIPTION goes to `x.y.z.9000`
+  and NEWS.md gains a `# pkgname (development version)` header. That pair is
+  what the drift audit's `.9xxx` carve-out encodes; a repo that releases
+  without the dev bump shows as drifted until it does one or the other.
+
 ## What is deliberately not here
 
 - **A package template.** `usethis::create_package()` and `rcompendium` already

@@ -46,6 +46,14 @@ jobs:
 
 The other four are in [STANDARD.md](STANDARD.md).
 
+## The fleet
+
+[`FLEET`](FLEET) lists the repos this standard watches — an entry means
+monitored, not conforming. [`docs/fleet-inventory.md`](docs/fleet-inventory.md)
+is the census: what is on CRAN under whose name, what drifted on census day,
+and what is out of scope with reasons. A weekly CI job clones `FLEET` and
+writes the current drift table to the run summary.
+
 ## Checking for drift
 
 ```bash
