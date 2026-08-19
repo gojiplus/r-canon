@@ -156,6 +156,7 @@ jobs:
       paths: |
         README.md
         STANDARD.md
+        CHANGELOG.md
 
   gate:
     name: gate

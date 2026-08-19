@@ -166,7 +166,8 @@ the fleet quietly runs unpatched actions forever.
 Tags version the workflows together. Repos reference the moving major tag `v1`,
 so a fix here reaches every repo on its next run. Breaking changes to the
 standard — anything that would make a currently-green repo fail — bump to `v2`,
-and repos move over deliberately.
+and repos move over deliberately. Each release is recorded in
+[CHANGELOG.md](CHANGELOG.md).
 
 ## Drift
 

@@ -72,4 +72,4 @@ running six bespoke workflows. That gap is all this repo fills.
 
 Tags version the workflows together. Repos reference the moving major tag `v1`.
 Breaking changes — anything that would make a currently-green repo fail — bump
-to `v2`.
+to `v2`. Each release is recorded in [CHANGELOG.md](CHANGELOG.md).

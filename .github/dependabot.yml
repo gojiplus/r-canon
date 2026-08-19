@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # The three reusable workflows in this repo are pinned by every package in
+  # The reusable workflows in this repo are pinned by every package in
   # the R fleet as @v1, so the action versions they reference are the fleet's
   # single point of update -- and its single point of failure. A stale major
   # here breaks CI everywhere at once, and nothing else was watching them.
