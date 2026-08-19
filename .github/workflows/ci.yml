@@ -215,6 +215,44 @@ jobs:
           fi
           echo "ok: detects lint in the test suite"
 
+  # A weekly look at the whole fleet, riding the existing cron. Deliberately
+  # NOT in gate.needs: monitored is not conforming, and a canon PR must not go
+  # red because some package drifted. Deliberately a step summary rather than
+  # a failing job while the fleet is still being rolled onto the lint
+  # standard; flip the `|| true` once drift.R reports the fleet clean, so
+  # regressions after that make the scheduled run visibly red.
+  fleet-drift:
+    name: fleet drift (scheduled)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: r-lib/actions/setup-r@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
+        with:
+          use-public-rspm: true
+
+      - name: Clone the fleet and audit it
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/fleet
+          while IFS= read -r repo; do
+            [ -z "$repo" ] && continue
+            # Blob-less rather than shallow: drift.R's version-vs-tag check
+            # reads tags, and --depth 1 would hide them.
+            git clone --quiet --filter=blob:none \
+              "https://github.com/$repo" "/tmp/fleet/$(basename "$repo")"
+          done < FLEET
+          {
+            echo '## Fleet drift'
+            echo '```'
+            Rscript tools/drift.R /tmp/fleet || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   # The one reusable workflow this repo can genuinely call on itself. A
   # local-path `uses:` runs the branch's own copy, so this tests the change
   # under review rather than whatever @v1 currently points at.
@@ -228,6 +266,7 @@ jobs:
         README.md
         STANDARD.md
         CHANGELOG.md
+        docs/fleet-inventory.md
 
   gate:
     name: gate
