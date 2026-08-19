@@ -155,6 +155,11 @@ rather than invented:
   users' code, and one repo had already encoded exactly this compromise. The
   alternative was what three repos actually did: disable the linter outright.
 
+Two paths are excluded because nobody writes them by hand: `R/RcppExports.R`
+(Rcpp generates it) and `tests/testthat/_fixtures` (where `httptest2` records
+API responses — it writes non-200 replies as `.R` files, and the virustotal
+pilot found 15 lints inside one of them, none of which a human could fix).
+
 Everything else stays at the defaults — including the trailing-whitespace,
 indentation and return linters that four repos had switched off. Those are a
 one-time `styler::style_pkg()` cost, not an ongoing one, and `styler` with

@@ -8,6 +8,15 @@ advanced by `major-tag.yml` after a release is cut, not a release of its own.
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-08-19
+
+### Fixed
+
+- The canonical `.lintr` excludes `tests/testthat/_fixtures`. `httptest2`
+  records non-200 API replies as `.R` files, and linting generated code
+  produced 15 unfixable lints in the virustotal pilot — the first thing the
+  pilot sent back to the standard.
+
 ## [1.2.0] - 2026-08-19
 
 ### Added
