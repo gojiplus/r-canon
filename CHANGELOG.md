@@ -8,6 +8,22 @@ advanced by `major-tag.yml` after a release is cut, not a release of its own.
 
 ## [Unreleased]
 
+### Fixed
+
+- `drift.R` no longer treats an old `CRAN-SUBMISSION` as a submission still in
+  flight. CRAN answers within weeks, so a record past 60 days is a submission
+  that never landed and was never cleaned up. bloomjoin's sat for eleven
+  months over an attempt that never reached CRAN, and for that whole time it
+  excused a real version-vs-tag drift -- the exact failure the in-flight
+  carve-out was supposed to be narrow enough to avoid.
+
+### Added
+
+- The `ci.yml` fixture is now a git repository with a tag, so the
+  version-vs-tag rules are exercised rather than skipped as "no tags, so
+  pre-release". Three named cases: a version ahead of its tag drifts, a fresh
+  submission record excuses it, and a years-old one does not.
+
 ## [1.3.2] - 2026-08-20
 
 ### Fixed

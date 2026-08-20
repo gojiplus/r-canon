@@ -85,12 +85,32 @@ references <- function(path, kind) {
   "ok"
 }
 
-# The version recorded in a CRAN-SUBMISSION file, or NA when there is none.
+# CRAN answers within weeks. A record older than this is not a decision
+# pending, it is a submission that never landed and was never cleaned up --
+# bloomjoin's sat for eleven months, and reading it as "awaiting a decision"
+# excused a real version-vs-tag drift for that whole time.
+submission_max_age_days <- 60
+
+# The version recorded in a CRAN-SUBMISSION file, or NA when there is none or
+# the record is too old to be a submission still in flight.
 submitted_version <- function(path) {
   f <- file.path(path, "CRAN-SUBMISSION")
   if (!file.exists(f)) return(NA_character_)
-  hit <- grep("^Version:", readLines(f, warn = FALSE), value = TRUE)
+  lines <- readLines(f, warn = FALSE)
+
+  hit <- grep("^Version:", lines, value = TRUE)
   if (!length(hit)) return(NA_character_)
+
+  when <- grep("^Date:", lines, value = TRUE)
+  if (length(when)) {
+    stamp <- as.POSIXct(
+      trimws(sub("^Date:", "", when[1])),
+      format = "%Y-%m-%d %H:%M:%S", tz = "UTC"
+    )
+    age <- as.numeric(difftime(Sys.time(), stamp, units = "days"))
+    if (!is.na(age) && age > submission_max_age_days) return(NA_character_)
+  }
+
   trimws(sub("^Version:", "", hit[1]))
 }
 
@@ -102,7 +122,8 @@ submitted_version <- function(path) {
 # CRAN accepts, not before, so between devtools::submit_cran() and the
 # acceptance email a package legitimately sits at the new version with the
 # previous tag. CRAN-SUBMISSION naming that same version is the evidence, and
-# it is written by submit_cran() itself rather than by hand.
+# it is written by submit_cran() itself rather than by hand -- but only while
+# the record is recent, see submitted_version().
 version_ok <- function(version, tag, submitted = NA_character_) {
   if (is.na(tag) || is.na(version)) return(TRUE)
   if (identical(paste0("v", version), tag)) return(TRUE)
