@@ -148,6 +148,15 @@ YAML
   fi
   cp "$CANON_DIR/.lintr" "$repo/.lintr"
 
+  # .lintr is package infrastructure, not package payload. Writing it without
+  # registering it earns a NOTE from R CMD check about a hidden file shipped
+  # in error -- bloomjoin's .Rbuildignore was the first that did not already
+  # happen to cover it.
+  if [ -f "$repo/.Rbuildignore" ] && ! grep -qF '^\.lintr$' "$repo/.Rbuildignore"; then
+    printf '^\\.lintr$\n' >> "$repo/.Rbuildignore"
+    echo "$name: added ^\\.lintr\$ to .Rbuildignore"
+  fi
+
   # Lint runs in CI, never in the test suite: lintr skips expect_lint_free()
   # on CRAN, and everywhere else the test makes other machines' lintr versions
   # into style oracles for R CMD check.

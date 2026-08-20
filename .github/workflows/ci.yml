@@ -133,6 +133,7 @@ jobs:
           DCF
           printf 'url: https://example.invalid/fixture\n' > /tmp/fixture/_pkgdown.yml
           printf 'MIT placeholder\n' > /tmp/fixture/LICENSE
+          printf '^docs$\n' > /tmp/fixture/.Rbuildignore
           printf '# fixture 0.1.0\n' > /tmp/fixture/NEWS.md
           printf 'lintr::expect_lint_free()\n' > /tmp/fixture/tests/testthat/test-pkg-style.R
 
@@ -163,6 +164,12 @@ jobs:
             exit 1
           fi
           echo "ok: .lintr byte-identical"
+
+          if ! grep -qF '^\.lintr$' /tmp/fixture/.Rbuildignore; then
+            echo "::error::adopt.sh did not register .lintr in .Rbuildignore"
+            exit 1
+          fi
+          echo "ok: .lintr registered in .Rbuildignore"
 
           if [ -f /tmp/fixture/tests/testthat/test-pkg-style.R ]; then
             echo "::error::adopt.sh left test-pkg-style.R in place"
