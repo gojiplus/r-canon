@@ -9,6 +9,28 @@ its own.
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-08-20
+
+### Fixed
+
+- `adopt.sh` keeps the inputs a repo has already set on a canonical shim.
+  Rewriting the file used to discard them: tubern, rdomains and virustotal
+  each lost their `link-check` `exclude:` list during the 2.0.0 rollout --
+  the API endpoints that answer 404 to an unauthenticated GET -- and only a
+  human reading the diff kept the job from going red on the next push.
+  Carried inputs land beside the coverage shim's own `secrets:` block rather
+  than replacing it, and `ci.yml` asserts both.
+
+- `drift.R` no longer fails guess for `statistical-tests.yml`. STANDARD.md
+  names it as the fleet's one legitimate bespoke workflow while
+  `allowed_extra` listed only `rhub.yaml`, so the repo was permanently
+  drifted with nothing to fix -- a rule stated in one place and contradicted
+  in another, which is the failure this repo exists to prevent.
+
+- `FLEET` tracks `gojiplus/superdf`. `soodoku/superdf` now redirects there, so
+  the weekly fleet-drift clone was following a redirect. The duplicate-repo
+  finding in the census is marked resolved.
+
 ## [2.0.0] - 2026-08-20
 
 ### Added

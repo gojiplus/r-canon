@@ -23,6 +23,28 @@ if [ $# -eq 0 ]; then
   exit 2
 fi
 
+# Print the trailing `with:` block of a shim that already references the
+# canonical reusable workflow named in $2, so rewriting the file does not
+# discard it.
+#
+# The inputs a repo sets there are configuration, not drift: link-check
+# exclude lists name the API endpoints that answer 404 to an unauthenticated
+# GET, and dropping them turns the job red on the next push. Three repos lost
+# theirs to this rewrite before the carry-over existed, and only caught it
+# because a human read the diff.
+#
+# `secrets:` ends the block rather than joining it -- the coverage shim writes
+# its own, and carrying a second copy would duplicate the key.
+carry_inputs() {
+  [ -f "$1" ] || return 0
+  grep -q "$2" "$1" || return 0
+  awk '
+    /^[[:space:]]*secrets:[[:space:]]*$/ { keep = 0 }
+    /^[[:space:]]*with:[[:space:]]*$/ { keep = 1 }
+    keep { print }
+  ' "$1"
+}
+
 for repo in "$@"; do
   if [ ! -f "$repo/DESCRIPTION" ]; then
     echo "skip $repo: no DESCRIPTION, not an R package" >&2
@@ -32,6 +54,12 @@ for repo in "$@"; do
   name=$(basename "$repo")
   wf="$repo/.github/workflows"
   mkdir -p "$wf"
+
+  carry_check=$(carry_inputs "$wf/R-CMD-check.yml" reusable-check.yml)
+  carry_pkgdown=$(carry_inputs "$wf/pkgdown.yml" reusable-pkgdown.yml)
+  carry_coverage=$(carry_inputs "$wf/test-coverage.yml" reusable-coverage.yml)
+  carry_lint=$(carry_inputs "$wf/lint.yml" reusable-lint.yml)
+  carry_links=$(carry_inputs "$wf/link-check.yml" reusable-link-check.yml)
 
   # Anything already there is either a copy of what we are about to reference
   # or something bespoke. Either way it goes; git keeps it if it is wanted back.
@@ -142,6 +170,17 @@ jobs:
   links:
     uses: $CANON/.github/workflows/reusable-link-check.yml@$REF
 YAML
+
+  restore() {
+    [ -n "$2" ] || return 0
+    printf '%s\n' "$2" >> "$wf/$1"
+    echo "$name: kept the inputs already set on $1"
+  }
+  restore R-CMD-check.yml "$carry_check"
+  restore pkgdown.yml "$carry_pkgdown"
+  restore test-coverage.yml "$carry_coverage"
+  restore lint.yml "$carry_lint"
+  restore link-check.yml "$carry_links"
 
   # The lint config is materialized, not referenced -- lintr only reads its
   # own file. The canonical copy always wins; reusable-lint.yml diffs it

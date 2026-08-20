@@ -215,6 +215,34 @@ jobs:
           fi
           echo "ok: an existing ignore rule is left alone"
 
+          # A repo's own inputs on a canonical shim are configuration, not
+          # drift. Three repos' link-check exclude lists were discarded by an
+          # earlier rewrite, which would have turned that job red on the next
+          # push had a human not read the diff.
+          cat >> /tmp/fixture/.github/workflows/link-check.yml <<'YAML'
+              with:
+                exclude: |
+                  ^https://api\.example\.invalid/v1$
+          YAML
+          cat >> /tmp/fixture/.github/workflows/test-coverage.yml <<'YAML'
+              with:
+                not-cran: true
+          YAML
+          tools/adopt.sh /tmp/fixture >/dev/null
+          # -F: the pattern contains regex-escaped dots as literal text, and
+          # `grep '\.'` would match an unescaped dot instead.
+          if ! grep -qF '^https://api\.example\.invalid/v1$' /tmp/fixture/.github/workflows/link-check.yml; then
+            echo "::error::adopt.sh discarded the inputs set on link-check.yml"
+            exit 1
+          fi
+          # Beside the secrets block the shim writes itself, not instead of it.
+          if ! grep -q 'not-cran: true' /tmp/fixture/.github/workflows/test-coverage.yml ||
+             [ "$(grep -c 'CODECOV_TOKEN' /tmp/fixture/.github/workflows/test-coverage.yml)" != "1" ]; then
+            echo "::error::adopt.sh mishandled inputs alongside the coverage secrets block"
+            exit 1
+          fi
+          echo "ok: inputs already set on a shim survive a rewrite"
+
       - name: drift.R passes a repo that is on the standard
         run: |
           set -euo pipefail

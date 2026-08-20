@@ -299,7 +299,10 @@ whether its `DESCRIPTION` version matches its latest tag — exactly, or as a
 not drifted. Leftover `CRAN-SUBMISSION`/`CRAN-RELEASE` files are noted without
 failing, since a submission legitimately carries one while it is pending.
 `rhub.yaml` is a sanctioned extra workflow: `rhub::rhub_setup()` writes it and
-the release process depends on it.
+the release process depends on it. So is guess's `statistical-tests.yml`, the
+one bespoke workflow in the fleet worth keeping -- this file said so in prose
+while `drift.R` failed the repo for it, which left guess permanently drifted
+with nothing to fix.
 
 The edition check earns its place: the table above has always required edition 3,
 and nothing verified it. A package can sit on edition 2 — still calling
