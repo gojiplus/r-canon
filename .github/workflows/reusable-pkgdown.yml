@@ -1,8 +1,13 @@
 # The fleet's pkgdown build and deploy.
 #
 # Builds on every push and pull request so a broken site is caught in review,
-# but only deploys from the default branch and from tags. Deploying from a pull
-# request would publish an unreviewed site.
+# but only deploys from the default branch. Deploying from a pull request would
+# publish an unreviewed site.
+#
+# The site is handed to GitHub Pages as a build artifact rather than pushed to
+# a gh-pages branch. Generated HTML therefore never enters git -- not on the
+# source branch, not on a parallel one. This is a step past the r-lib template,
+# which still deploys via gh-pages; see STANDARD.md for why.
 
 name: reusable-pkgdown
 
@@ -15,24 +20,24 @@ on:
         type: string
         default: "any::pkgdown, local::."
 
+# Two deploys racing each other can publish the older build last. Pull requests
+# never deploy, so give each its own group rather than serialising them behind
+# the branch builds. Never cancel in flight: a half-finished Pages deployment
+# is worse than a slow one.
+concurrency:
+  group: pkgdown-${{ github.event_name != 'pull_request' || github.run_id }}
+  cancel-in-progress: false
+
+# A called workflow cannot grant itself more than the caller has, so every
+# scope here and on the deploy job has to appear in the CALLER's permissions
+# block too. See STANDARD.md for the shim.
+permissions:
+  contents: read
+
 jobs:
-  pkgdown:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-
-    # Two deploys racing each other can publish the older build last. Pull
-    # requests never deploy, so give each its own group rather than serialising
-    # them behind the branch builds.
-    concurrency:
-      group: pkgdown-${{ github.event_name != 'pull_request' || github.run_id }}
-
-    # Pushing to gh-pages needs write. A called workflow cannot grant itself
-    # more than the caller has, and these repos default to a read-only token,
-    # so the CALLER must also declare `permissions: contents: write` on the job
-    # that calls this. Without it the run fails at startup with no log. See
-    # STANDARD.md for the shim.
-    permissions:
-      contents: write
 
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
@@ -55,15 +60,39 @@ jobs:
         shell: Rscript {0}
         run: pkgdown::build_site_github_pages(new_process = FALSE, install = FALSE)
 
-      - name: Deploy to gh-pages
-        # Only from the default branch or a tag. Pull requests build but do not
-        # publish.
-        if: >
-          github.event_name != 'pull_request' &&
-          (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) ||
-           startsWith(github.ref, 'refs/tags/'))
-        uses: JamesIves/github-pages-deploy-action@fa24774553152dd7873cd16ebd8d959b010c5445 # v4.9.0
+      # Uploaded on pull requests as well, so a site that builds but cannot be
+      # packaged fails in review rather than on the default branch.
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
-          clean: false
-          branch: gh-pages
-          folder: docs
+          path: docs
+
+  deploy:
+    needs: build
+
+    # Only from the default branch. Pull requests build but do not publish.
+    #
+    # Tags are excluded deliberately, unlike the gh-pages version of this
+    # workflow: the github-pages environment carries a deployment branch policy
+    # naming the default branch, so a tag-triggered deploy sits blocked rather
+    # than publishing. Nothing is lost -- a release is cut from a commit on the
+    # default branch, and that push already deployed it.
+    if: >
+      github.event_name != 'pull_request' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # No branch is written, so contents access is not needed at all. The deploy
+    # mints an OIDC token and hands the artifact to Pages instead.
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0

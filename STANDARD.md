@@ -16,13 +16,13 @@ what lives here.
 
 | | |
 |---|---|
-| CI | References the five reusable workflows below, pinned to `@v1` |
+| CI | References the five reusable workflows below, pinned to `@v2` |
 | Workflow filenames | `R-CMD-check.yml`, `pkgdown.yml`, `test-coverage.yml`, `link-check.yml`, `lint.yml` — exactly these |
 | Checks on | Ubuntu release/devel/oldrel-1, macOS release, Windows release |
 | Check bar | `R CMD check --as-cran` clean; warnings fail the build |
 | Tests | `testthat`, edition 3, under `tests/testthat/` |
 | Lint | The canonical `.lintr` from this repo, byte-identical, enforced in CI by `lint.yml` — never in the test suite |
-| Docs | roxygen2, and a `pkgdown` site deployed to `gh-pages` |
+| Docs | roxygen2, and a `pkgdown` site built in CI and published to GitHub Pages; `docs/` is gitignored, never committed |
 | Version | Semantic, in `DESCRIPTION`, matching a `v`-prefixed git tag; `.9xxx` dev versions between releases |
 | License | Declared in `DESCRIPTION` with a `LICENSE` file |
 | News | `NEWS.md`, newest first, one section per released version, a `(development version)` header on top between releases |
@@ -43,7 +43,7 @@ on:
     branches: [main, master]
 jobs:
   check:
-    uses: gojiplus/r-canon/.github/workflows/reusable-check.yml@v1
+    uses: gojiplus/r-canon/.github/workflows/reusable-check.yml@v2
 ```
 
 `.github/workflows/pkgdown.yml`:
@@ -61,14 +61,22 @@ on:
 jobs:
   pkgdown:
     permissions:
-      contents: write
-    uses: gojiplus/r-canon/.github/workflows/reusable-pkgdown.yml@v1
+      contents: read
+      pages: write
+      id-token: write
+    uses: gojiplus/r-canon/.github/workflows/reusable-pkgdown.yml@v2
 ```
 
 That `permissions` block is required, not decorative. A called workflow cannot
-grant itself more than the caller has, and these repos default to a read-only
-token, so the deploy to `gh-pages` needs the caller to ask for write. Omit it
-and the run fails at startup in zero seconds with no log to read.
+grant itself more than the caller has, so anything the site job needs has to be
+granted here first. Omit it and the run fails at startup in zero seconds with
+no log to read.
+
+`contents: read` looks redundant — it is the default — but naming any scope in
+a `permissions` block sets every unnamed one to `none`, so leaving it out takes
+read access away from the checkout. `pages: write` and `id-token: write` are
+what the deploy needs: it hands Pages an artifact under an OIDC token rather
+than pushing a branch.
 
 `.github/workflows/test-coverage.yml`:
 
@@ -81,7 +89,7 @@ on:
     branches: [main, master]
 jobs:
   coverage:
-    uses: gojiplus/r-canon/.github/workflows/reusable-coverage.yml@v1
+    uses: gojiplus/r-canon/.github/workflows/reusable-coverage.yml@v2
     secrets:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 ```
@@ -102,7 +110,7 @@ permissions:
   contents: read
 jobs:
   lint:
-    uses: gojiplus/r-canon/.github/workflows/reusable-lint.yml@v1
+    uses: gojiplus/r-canon/.github/workflows/reusable-lint.yml@v2
 ```
 
 `.github/workflows/link-check.yml`:
@@ -121,7 +129,7 @@ permissions:
   contents: read
 jobs:
   links:
-    uses: gojiplus/r-canon/.github/workflows/reusable-link-check.yml@v1
+    uses: gojiplus/r-canon/.github/workflows/reusable-link-check.yml@v2
 ```
 
 The `permissions` block here does the opposite job to the one on `pkgdown`.
@@ -140,6 +148,39 @@ sources, so a README badge is invisible to them. tubern's R-CMD-check badge
 pointed at a renamed workflow and returned 404 for months while `urlchecker`
 reported "All URLs are correct!" against the same tree. Keep using `urlchecker`
 for `\url{}` in `Rd` and for its redirect fixes; it answers a different question.
+
+## The site
+
+`pkgdown` builds it, GitHub Actions publishes it, and the generated HTML never
+enters git. `docs/` is in `.gitignore`; a local `pkgdown::build_site()` writes
+a copy for looking at, and nothing else reads it.
+
+This is the recommendation in [R Packages (2e), ch. 19](https://r-pkgs.org/website.html),
+and one step past it. That book — and `usethis::use_pkgdown_github_pages()` —
+keeps the definitive site on an orphan `gh-pages` branch that CI force-pushes.
+Here the build is handed straight to Pages as an artifact, so there is no
+parallel branch of generated files at all. The same mechanism the Python fleet
+already uses, and one less thing in `git log`.
+
+Publishing to a branch is what a repo's Pages setting has to agree with, and
+that disagreement is the failure this was changed for. tuber's Pages source was
+already set to Actions while CI went on pushing to `gh-pages`. Nothing read the
+branch. Every pkgdown run reported success, and the live site went on serving a
+build of a commit that is no longer in `master`'s history at all — at version
+2.0.0, while `gh-pages` and the committed `docs/` both held 2.0.0.9000. Three
+copies of the site, no two alike, and green checks over all of it.
+
+So adoption includes one repo setting, and `adopt.sh` prints the command:
+
+```bash
+gh api -X PUT repos/OWNER/REPO/pages -f build_type=workflow
+```
+
+Deploys happen from the default branch only. The `github-pages` environment
+carries a deployment branch policy naming that branch, so a tag-triggered
+deploy would sit blocked rather than publish — and nothing is lost, since a
+release is cut from a commit on the default branch and that push already
+deployed it.
 
 ## Lint and style
 
@@ -228,7 +269,7 @@ the fleet quietly runs unpatched actions forever.
 
 ## Versioning
 
-Tags version the workflows together. Repos reference the moving major tag `v1`,
+Tags version the workflows together. Repos reference the moving major tag `v2`,
 so a fix here reaches every repo on its next run. Breaking changes to the
 standard — anything that would make a currently-green repo fail — bump to `v2`,
 and repos move over deliberately. Each release is recorded in
@@ -249,9 +290,10 @@ at the new version with the previous tag. `drift.R` treats that as a note
 when `CRAN-SUBMISSION` names the same version, and as drift otherwise —
 `submit_cran()` writes that file itself, so the evidence is not hand-made.
 
-It reports whether each repo references `@v1`, uses the canonical filenames,
+It reports whether each repo references `@v2`, uses the canonical filenames,
 carries the canonical `.lintr` unmodified, has `testthat` at **edition 3**,
-`pkgdown`, a `LICENSE` and a `NEWS.md`, keeps lint out of the test suite, and
+`pkgdown`, a `LICENSE` and a `NEWS.md`, keeps lint out of the test suite, has
+no generated `docs/` under version control, and
 whether its `DESCRIPTION` version matches its latest tag — exactly, or as a
 `.9xxx` dev version on top of it. A repo with no tags at all is pre-release,
 not drifted. Leftover `CRAN-SUBMISSION`/`CRAN-RELEASE` files are noted without

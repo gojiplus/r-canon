@@ -10,7 +10,7 @@
 # has drifted, so this can gate CI later.
 
 canon_repo <- "gojiplus/r-canon"
-pin <- "@v1"
+pin <- "@v2"
 
 wanted <- c(
   check = "R-CMD-check.yml",
@@ -74,7 +74,7 @@ git <- function(path, args) {
   if (!length(out)) NA_character_ else out[1]
 }
 
-# Does this repo reference the given reusable workflow, pinned to @v1?
+# Does this repo reference the given reusable workflow, pinned to @v2?
 references <- function(path, kind) {
   f <- file.path(path, ".github", "workflows", wanted[[kind]])
   if (!file.exists(f)) return("missing")
@@ -83,6 +83,18 @@ references <- function(path, kind) {
   if (!grepl(want, txt, fixed = TRUE)) return("not-canon")
   if (!grepl(paste0(want, pin), txt, fixed = TRUE)) return("unpinned")
   "ok"
+}
+
+# Generated pkgdown output under version control. CI builds and publishes the
+# site, so a committed docs/ is a second copy that nothing keeps current --
+# tuber's was three releases behind the live site, and the live site was itself
+# stale, with every pkgdown run reporting success throughout.
+docs_tracked <- function(path) {
+  out <- suppressWarnings(system2(
+    "git", c("-C", shQuote(path), "ls-files", "--", "docs"),
+    stdout = TRUE, stderr = FALSE
+  ))
+  length(out)
 }
 
 # CRAN answers within weeks. A record older than this is not a decision
@@ -164,6 +176,7 @@ audit <- function(path, canon_lintr) {
       file.path(path, "pkgdown", c("_pkgdown.yml", "_pkgdown.yaml"))
     )),
     license = any(file.exists(file.path(path, c("LICENSE", "LICENSE.md")))),
+    docs_tracked = docs_tracked(path),
     news = file.exists(file.path(path, "NEWS.md")),
     # Lint runs in CI, never the test suite: lintr skips expect_lint_free() on
     # CRAN, and elsewhere the test makes other machines' lintr versions into
@@ -243,7 +256,8 @@ main <- function(args) {
       !identical(r$lintr_cfg, "ok") ||
       !r$testthat || !r$pkgdown_cfg || length(r$extra) > 0 ||
       !identical(ed(r$testthat, r$edition), "ed3") ||
-      !r$license || !r$news || r$style_test || !r$version_ok
+      !r$license || !r$news || r$style_test || !r$version_ok ||
+      r$docs_tracked > 0
     if (bad) drifted <- c(drifted, r$repo)
 
     cat(
@@ -271,6 +285,10 @@ main <- function(args) {
     }
     if (!r$license) note("DRIFT: no LICENSE file")
     if (!r$news) note("DRIFT: no NEWS.md")
+    if (r$docs_tracked > 0) {
+      note("DRIFT: ", r$docs_tracked, " generated pkgdown file(s) committed under docs/",
+           " -- CI builds and publishes the site; gitignore docs/")
+    }
     if (r$style_test) {
       note("DRIFT: tests/testthat/test-pkg-style.R -- lint belongs in CI, not the test suite")
     }

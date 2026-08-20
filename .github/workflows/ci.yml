@@ -134,12 +134,24 @@ jobs:
           printf 'url: https://example.invalid/fixture\n' > /tmp/fixture/_pkgdown.yml
           printf 'MIT placeholder\n' > /tmp/fixture/LICENSE
           printf '^docs$\n' > /tmp/fixture/.Rbuildignore
+          # Spelled as a bare directory name, which git honours exactly as
+          # `/docs/` does -- adopt.sh must not add a second rule beside it.
+          printf 'docs\n' > /tmp/fixture/.gitignore
           printf '# fixture 0.1.0\n' > /tmp/fixture/NEWS.md
           printf 'lintr::expect_lint_free()\n' > /tmp/fixture/tests/testthat/test-pkg-style.R
+
+          # Committed pkgdown output, which adopt.sh has to untrack. Staged for
+          # real rather than merely written: the check reads the git index.
+          mkdir -p /tmp/fixture/docs
+          printf '<html>generated</html>\n' > /tmp/fixture/docs/index.html
 
           # A tag, so the version-vs-tag rules are live rather than skipped as
           # "no tags at all, so pre-release".
           git -C /tmp/fixture init -q -b main
+          # -f because the fixture also carries an ignore rule for the
+          # directory. Contradictory on its face, and exactly tuber's real
+          # history: the site was committed first and ignored later.
+          git -C /tmp/fixture add -f docs/index.html
           git -C /tmp/fixture -c user.email=ci@example.invalid -c user.name=ci \
             commit -q --allow-empty -m fixture
           git -C /tmp/fixture tag v0.1.0
@@ -157,8 +169,8 @@ jobs:
               echo "::error::adopt.sh did not write $f"
               exit 1
             fi
-            if ! grep -q 'gojiplus/r-canon/.github/workflows/reusable-.*@v1' "$path"; then
-              echo "::error::$f does not reference r-canon@v1"
+            if ! grep -q 'gojiplus/r-canon/.github/workflows/reusable-.*@v2' "$path"; then
+              echo "::error::$f does not reference r-canon@v2"
               exit 1
             fi
             echo "ok: $f"
@@ -183,6 +195,25 @@ jobs:
             exit 1
           fi
           echo "ok: style test removed"
+
+          if [ -n "$(git -C /tmp/fixture ls-files -- docs)" ]; then
+            echo "::error::adopt.sh left generated docs/ under version control"
+            exit 1
+          fi
+          if ! grep -qE '^/?docs/?$' /tmp/fixture/.gitignore; then
+            echo "::error::adopt.sh did not gitignore docs/"
+            exit 1
+          fi
+          echo "ok: committed docs/ untracked and ignored"
+
+          # The fixture already ignored the directory under a different
+          # spelling. tubern's .gitignore said `docs`, and a literal match on
+          # `/docs/` put a second entry beside it that ignored nothing new.
+          if [ "$(grep -cE '^/?docs/?$' /tmp/fixture/.gitignore)" != "1" ]; then
+            echo "::error::adopt.sh duplicated an existing docs/ ignore rule"
+            exit 1
+          fi
+          echo "ok: an existing ignore rule is left alone"
 
       - name: drift.R passes a repo that is on the standard
         run: |
@@ -229,6 +260,16 @@ jobs:
           fi
           echo "ok: detects lint in the test suite"
           rm /tmp/fixture/tests/testthat/test-pkg-style.R
+
+          # -f because adopt.sh just gitignored it, which is the point: the
+          # rule is about what git tracks, not about what is on disk.
+          git -C /tmp/fixture add -f docs/index.html
+          if Rscript tools/drift.R /tmp/fixture; then
+            echo "::error::drift.R reported committed pkgdown output as clean"
+            exit 1
+          fi
+          echo "ok: detects generated docs/ under version control"
+          git -C /tmp/fixture rm -r --cached --quiet docs
 
       - name: drift.R tells a submission in flight from one that never landed
         run: |
@@ -301,7 +342,7 @@ jobs:
 
   # The one reusable workflow this repo can genuinely call on itself. A
   # local-path `uses:` runs the branch's own copy, so this tests the change
-  # under review rather than whatever @v1 currently points at.
+  # under review rather than whatever @v2 currently points at.
   link-check:
     name: link-check (self-call)
     permissions:
