@@ -8,6 +8,14 @@ advanced by `major-tag.yml` after a release is cut, not a release of its own.
 
 ## [Unreleased]
 
+### Fixed
+
+- `adopt.sh` registers `^\.lintr$` in the repo's `.Rbuildignore`. It writes
+  that file, so leaving it unregistered earned a NOTE from `R CMD check`
+  about a hidden file shipped in error. bloomjoin was the first adopter whose
+  `.Rbuildignore` did not already happen to cover it; the other three did, so
+  the gap went unseen through three adoptions.
+
 ## [1.3.1] - 2026-08-19
 
 ### Fixed
