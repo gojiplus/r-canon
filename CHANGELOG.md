@@ -8,6 +8,8 @@ advanced by `major-tag.yml` after a release is cut, not a release of its own.
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-08-20
+
 ### Fixed
 
 - `adopt.sh` registers `^\.lintr$` in the repo's `.Rbuildignore`. It writes
@@ -15,6 +17,11 @@ advanced by `major-tag.yml` after a release is cut, not a release of its own.
   about a hidden file shipped in error. bloomjoin was the first adopter whose
   `.Rbuildignore` did not already happen to cover it; the other three did, so
   the gap went unseen through three adoptions.
+- `drift.R`'s table no longer runs one field into the next. It prints with
+  `sep = ""`, so a value at or over its column width lost its separator, and
+  a `.9000` dev version -- which the standard itself prescribes between a
+  release and the next submission -- is one character too wide. tuber's row
+  read `2.0.0.9000v2.0.0`.
 
 ## [1.3.1] - 2026-08-19
 

@@ -166,7 +166,13 @@ audit <- function(path, canon_lintr) {
   )
 }
 
-pad <- function(x, n) formatC(x, width = -n, flag = " ")
+# cat() below runs with sep = "", so a field at or over its column width would
+# run into the next one. .9000 dev versions are the standard's own convention
+# and overflow the version column, so keep a separating space regardless.
+pad <- function(x, n) {
+  out <- formatC(x, width = -n, flag = " ")
+  ifelse(nchar(out) >= n, paste0(out, " "), out)
+}
 
 main <- function(args) {
   if (!length(args)) args <- "."
@@ -203,11 +209,11 @@ main <- function(args) {
   }
 
   cat("\n")
-  cat(pad("repo", 13), pad("version", 9), pad("tag", 10), pad("roxygen", 9),
+  cat(pad("repo", 13), pad("version", 11), pad("tag", 10), pad("roxygen", 9),
       pad("check", 10), pad("pkgdown", 10), pad("cover", 10), pad("links", 10),
       pad("lint", 10), pad(".lintr", 9), pad("tests", 6), pad("site", 6),
       "extra\n", sep = "")
-  cat(strrep("-", 130), "\n", sep = "")
+  cat(strrep("-", 132), "\n", sep = "")
 
   drifted <- character()
   for (r in rows) {
@@ -221,7 +227,7 @@ main <- function(args) {
 
     cat(
       pad(r$repo, 13),
-      pad(ifelse(is.na(r$version), "-", r$version), 9),
+      pad(ifelse(is.na(r$version), "-", r$version), 11),
       pad(ifelse(is.na(r$tag), "-", r$tag), 10),
       pad(ifelse(is.na(r$roxygen), "-", r$roxygen), 9),
       pad(mark(r$check), 10),
