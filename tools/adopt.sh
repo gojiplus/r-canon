@@ -165,7 +165,10 @@ YAML
   # docs/ is a second copy that goes stale silently -- tuber's sat three
   # releases behind the live site before anyone looked. R Packages (2e) ch. 19
   # reaches the same conclusion from the other direction.
-  if ! grep -qx '/docs/' "$repo/.gitignore" 2>/dev/null; then
+  # Any spelling git already honours counts: a bare `docs` ignores the
+  # directory just as well as `/docs/`, and appending a second entry beside it
+  # would be noise in a file people read.
+  if ! grep -qE '^/?docs/?$' "$repo/.gitignore" 2>/dev/null; then
     printf '\n# pkgdown output. Disposable local build product; CI builds and\n# publishes the definitive site.\n/docs/\n' >> "$repo/.gitignore"
     echo "$name: added /docs/ to .gitignore"
   fi

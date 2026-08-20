@@ -134,6 +134,9 @@ jobs:
           printf 'url: https://example.invalid/fixture\n' > /tmp/fixture/_pkgdown.yml
           printf 'MIT placeholder\n' > /tmp/fixture/LICENSE
           printf '^docs$\n' > /tmp/fixture/.Rbuildignore
+          # Spelled as a bare directory name, which git honours exactly as
+          # `/docs/` does -- adopt.sh must not add a second rule beside it.
+          printf 'docs\n' > /tmp/fixture/.gitignore
           printf '# fixture 0.1.0\n' > /tmp/fixture/NEWS.md
           printf 'lintr::expect_lint_free()\n' > /tmp/fixture/tests/testthat/test-pkg-style.R
 
@@ -145,7 +148,10 @@ jobs:
           # A tag, so the version-vs-tag rules are live rather than skipped as
           # "no tags at all, so pre-release".
           git -C /tmp/fixture init -q -b main
-          git -C /tmp/fixture add docs/index.html
+          # -f because the fixture also carries an ignore rule for the
+          # directory. Contradictory on its face, and exactly tuber's real
+          # history: the site was committed first and ignored later.
+          git -C /tmp/fixture add -f docs/index.html
           git -C /tmp/fixture -c user.email=ci@example.invalid -c user.name=ci \
             commit -q --allow-empty -m fixture
           git -C /tmp/fixture tag v0.1.0
@@ -194,11 +200,20 @@ jobs:
             echo "::error::adopt.sh left generated docs/ under version control"
             exit 1
           fi
-          if ! grep -qx '/docs/' /tmp/fixture/.gitignore; then
+          if ! grep -qE '^/?docs/?$' /tmp/fixture/.gitignore; then
             echo "::error::adopt.sh did not gitignore docs/"
             exit 1
           fi
           echo "ok: committed docs/ untracked and ignored"
+
+          # The fixture already ignored the directory under a different
+          # spelling. tubern's .gitignore said `docs`, and a literal match on
+          # `/docs/` put a second entry beside it that ignored nothing new.
+          if [ "$(grep -cE '^/?docs/?$' /tmp/fixture/.gitignore)" != "1" ]; then
+            echo "::error::adopt.sh duplicated an existing docs/ ignore rule"
+            exit 1
+          fi
+          echo "ok: an existing ignore rule is left alone"
 
       - name: drift.R passes a repo that is on the standard
         run: |
