@@ -58,6 +58,11 @@ permissions:
 jobs:
   check:
     runs-on: ${{ matrix.config.os }}
+    # A leg normally finishes in single-digit minutes. This bound exists for
+    # the failure that actually happens: r-lib/actions stalling inside
+    # apt-get, which without a timeout burns GitHub's six-hour default --
+    # three jobs sat in it for two hours during the virustotal 0.7.0 release.
+    timeout-minutes: 60
     name: ${{ matrix.config.os }} (${{ matrix.config.r }})
 
     strategy:

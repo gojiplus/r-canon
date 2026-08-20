@@ -243,6 +243,12 @@ if any has drifted:
 Rscript tools/drift.R ~/Documents/GitHub
 ```
 
+A release in flight is not drift. The process below tags after CRAN accepts,
+so between `devtools::submit_cran()` and the acceptance email a package sits
+at the new version with the previous tag. `drift.R` treats that as a note
+when `CRAN-SUBMISSION` names the same version, and as drift otherwise —
+`submit_cran()` writes that file itself, so the evidence is not hand-made.
+
 It reports whether each repo references `@v1`, uses the canonical filenames,
 carries the canonical `.lintr` unmodified, has `testthat` at **edition 3**,
 `pkgdown`, a `LICENSE` and a `NEWS.md`, keeps lint out of the test suite, and

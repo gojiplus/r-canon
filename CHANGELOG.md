@@ -8,6 +8,23 @@ advanced by `major-tag.yml` after a release is cut, not a release of its own.
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-08-19
+
+### Fixed
+
+- Every reusable workflow now sets `timeout-minutes`. Only the lint workflow
+  had one, so a job that stalled inside `r-lib/actions` ran until GitHub's
+  six-hour default: during the virustotal 0.7.0 release three of them sat in
+  `setup-r` for two hours apiece. The bounds are generous (60 minutes per
+  check leg, 45 for coverage and pkgdown, 15 for the link check) because they
+  exist to catch a hang, not to police a slow package.
+- `drift.R` no longer reports a release in flight as drift. The release
+  process tags after CRAN accepts, so between `submit_cran()` and the
+  acceptance email a package legitimately sits at the new version with the
+  previous tag; `CRAN-SUBMISSION` naming that same version is the evidence,
+  and it is written by `submit_cran()` rather than by hand. A submission
+  record for an *older* version is still a stale-file note.
+
 ## [1.3.0] - 2026-08-19
 
 ### Added

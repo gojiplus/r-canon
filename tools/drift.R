@@ -85,12 +85,28 @@ references <- function(path, kind) {
   "ok"
 }
 
+# The version recorded in a CRAN-SUBMISSION file, or NA when there is none.
+submitted_version <- function(path) {
+  f <- file.path(path, "CRAN-SUBMISSION")
+  if (!file.exists(f)) return(NA_character_)
+  hit <- grep("^Version:", readLines(f, warn = FALSE), value = TRUE)
+  if (!length(hit)) return(NA_character_)
+  trimws(sub("^Version:", "", hit[1]))
+}
+
 # The version rule: DESCRIPTION matches the latest v-prefixed tag, or is the
 # tag's version with a .9xxx development suffix (what use_dev_version() writes
 # between releases). A repo with no tags at all is pre-release, not drifted.
-version_ok <- function(version, tag) {
+#
+# The third case is a submission in flight. The release process tags after
+# CRAN accepts, not before, so between devtools::submit_cran() and the
+# acceptance email a package legitimately sits at the new version with the
+# previous tag. CRAN-SUBMISSION naming that same version is the evidence, and
+# it is written by submit_cran() itself rather than by hand.
+version_ok <- function(version, tag, submitted = NA_character_) {
   if (is.na(tag) || is.na(version)) return(TRUE)
   if (identical(paste0("v", version), tag)) return(TRUE)
+  if (!is.na(submitted) && identical(submitted, version)) return(TRUE)
   startsWith(version, paste0(sub("^v", "", tag), ".9"))
 }
 
@@ -132,12 +148,18 @@ audit <- function(path, canon_lintr) {
     # CRAN, and elsewhere the test makes other machines' lintr versions into
     # style oracles for R CMD check.
     style_test = file.exists(file.path(path, "tests", "testthat", "test-pkg-style.R")),
-    # Submission records should not outlive the release they record.
+    # A submission record for the version in DESCRIPTION is a release in
+    # flight. One for an older version outlived the release it recorded.
     stale_submission = Filter(
-      function(f) file.exists(file.path(path, f)),
+      function(f) {
+        if (!file.exists(file.path(path, f))) return(FALSE)
+        !(identical(f, "CRAN-SUBMISSION") &&
+            identical(submitted_version(path), version))
+      },
       c("CRAN-SUBMISSION", "CRAN-RELEASE")
     ),
-    version_ok = version_ok(version, tag),
+    in_flight = identical(submitted_version(path), version) && !is.na(version),
+    version_ok = version_ok(version, tag, submitted_version(path)),
     # Files beyond the five canonical ones are what a bespoke CI system looks
     # like from the outside.
     extra = setdiff(present, c(unname(wanted), allowed_extra))
@@ -224,6 +246,10 @@ main <- function(args) {
     if (!r$news) note("DRIFT: no NEWS.md")
     if (r$style_test) {
       note("DRIFT: tests/testthat/test-pkg-style.R -- lint belongs in CI, not the test suite")
+    }
+    if (isTRUE(r$in_flight)) {
+      note("note: ", r$version, " submitted to CRAN and awaiting a decision",
+           " -- tag it once accepted")
     }
     if (length(r$stale_submission)) {
       note("note: ", paste(r$stale_submission, collapse = " and "),
