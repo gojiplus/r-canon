@@ -42,8 +42,11 @@ as out of scope) — which is exactly why this round of the standard exists.
   release checklist in STANDARD.md after the virustotal pilot.
 - **rdomains** sits correctly at `0.5.0.9000` over `v0.5.0` — the one repo
   already following the dev-version convention the standard now audits.
-- **`gojiplus/superdf` vs `soodoku/superdf`**: two repos, one package; the
-  local checkout tracks `soodoku`. Pick one and archive the other.
+- ~~**`gojiplus/superdf` vs `soodoku/superdf`**: two repos, one package; the
+  local checkout tracks `soodoku`. Pick one and archive the other.~~
+  **Resolved 2026-08-20**: `soodoku/superdf` now redirects to
+  `gojiplus/superdf`, and `FLEET` names the surviving one. The census table
+  above records census-day state and is left as written.
 
 ## Out of scope, deliberately
 

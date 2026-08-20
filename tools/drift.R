@@ -31,7 +31,13 @@ reusable <- c(
 # Workflow files beyond the shims that are not drift. rhub.yaml is written by
 # rhub::rhub_setup(), and the release checklist in STANDARD.md uses R-hub v2,
 # so forbidding it would ban the standard's own release process.
-allowed_extra <- c("rhub.yaml", "rhub.yml")
+#
+# statistical-tests.yml is guess's own, and STANDARD.md names it as the one
+# legitimate bespoke workflow the fleet has. Listing it there while failing it
+# here made guess permanently drifted with nothing to fix -- a rule the
+# standard states in one place and contradicts in another is the exact failure
+# this repo exists to prevent.
+allowed_extra <- c("rhub.yaml", "rhub.yml", "statistical-tests.yml")
 
 # The canonical .lintr travels with this script: tools/drift.R sits one level
 # below the repo root that holds it. Fail loudly if it cannot be found -- a
