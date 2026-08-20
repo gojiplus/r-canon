@@ -18,6 +18,7 @@ on:
 jobs:
   pkgdown:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     # Two deploys racing each other can publish the older build last. Pull
     # requests never deploy, so give each its own group rather than serialising
