@@ -137,6 +137,13 @@ jobs:
           printf '# fixture 0.1.0\n' > /tmp/fixture/NEWS.md
           printf 'lintr::expect_lint_free()\n' > /tmp/fixture/tests/testthat/test-pkg-style.R
 
+          # A tag, so the version-vs-tag rules are live rather than skipped as
+          # "no tags at all, so pre-release".
+          git -C /tmp/fixture init -q -b main
+          git -C /tmp/fixture -c user.email=ci@example.invalid -c user.name=ci \
+            commit -q --allow-empty -m fixture
+          git -C /tmp/fixture tag v0.1.0
+
       - name: adopt.sh writes every shim and config the standard requires
         run: |
           set -euo pipefail
@@ -221,6 +228,38 @@ jobs:
             exit 1
           fi
           echo "ok: detects lint in the test suite"
+          rm /tmp/fixture/tests/testthat/test-pkg-style.R
+
+      - name: drift.R tells a submission in flight from one that never landed
+        run: |
+          set -euo pipefail
+          # The fixture is tagged v0.1.0. Bumping DESCRIPTION past the tag is
+          # drift unless a *recent* CRAN-SUBMISSION says a release is pending.
+          sed -i 's/^Version: 0.1.0$/Version: 0.2.0/' /tmp/fixture/DESCRIPTION
+
+          if Rscript tools/drift.R /tmp/fixture; then
+            echo "::error::drift.R reported 0.2.0 over tag v0.1.0 as clean"
+            exit 1
+          fi
+          echo "ok: detects a version ahead of its tag"
+
+          printf 'Version: 0.2.0\nDate: %s\nSHA: deadbeef\n' \
+            "$(date -u '+%Y-%m-%d %H:%M:%S UTC')" > /tmp/fixture/CRAN-SUBMISSION
+          Rscript tools/drift.R /tmp/fixture
+          echo "ok: a fresh submission record excuses it"
+
+          # bloomjoin's record sat for eleven months over a submission that
+          # never landed, and excused a real drift for that whole time.
+          printf 'Version: 0.2.0\nDate: 2020-01-01 00:00:00 UTC\nSHA: deadbeef\n' \
+            > /tmp/fixture/CRAN-SUBMISSION
+          if Rscript tools/drift.R /tmp/fixture; then
+            echo "::error::drift.R treated a years-old submission record as in flight"
+            exit 1
+          fi
+          echo "ok: an aged-out record no longer excuses it"
+
+          rm /tmp/fixture/CRAN-SUBMISSION
+          sed -i 's/^Version: 0.2.0$/Version: 0.1.0/' /tmp/fixture/DESCRIPTION
 
   # A weekly look at the whole fleet, riding the existing cron. Deliberately
   # NOT in gate.needs: monitored is not conforming, and a canon PR must not go
