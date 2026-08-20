@@ -3,10 +3,51 @@
 All notable changes to the standard are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-Release tags are `vX.Y.Z`; the fleet-facing `v1` tag is a moving pointer
-advanced by `major-tag.yml` after a release is cut, not a release of its own.
+Release tags are `vX.Y.Z`; the fleet-facing major tag (`v2`) is a moving
+pointer advanced by `major-tag.yml` after a release is cut, not a release of
+its own.
 
 ## [Unreleased]
+
+## [2.0.0] - 2026-08-20
+
+### Added
+
+- The `ci.yml` fixture is now a git repository with a tag, so the
+  version-vs-tag rules are exercised rather than skipped as "no tags, so
+  pre-release". Three named cases: a version ahead of its tag drifts, a fresh
+  submission record excuses it, and a years-old one does not.
+
+### Changed
+
+- **Breaking.** `reusable-pkgdown.yml` hands the built site to GitHub Pages as
+  an artifact instead of force-pushing it to a `gh-pages` branch. Callers must
+  replace `permissions: contents: write` with `contents: read`, `pages: write`
+  and `id-token: write`, and the repo's Pages source must be set to GitHub
+  Actions -- `gh api -X PUT repos/OWNER/REPO/pages -f build_type=workflow`,
+  which `adopt.sh` now prints. A repo left on the old shim fails at startup
+  with no log; one left on a branch Pages source deploys successfully and
+  publishes nowhere.
+
+  The fleet's own evidence for the change: tuber's Pages source was already set
+  to Actions while CI kept pushing to `gh-pages`. Every pkgdown run reported
+  success while the live site served a build of a commit no longer in
+  `master`'s history, at 2.0.0, against `gh-pages` and a committed `docs/` that
+  both said 2.0.0.9000. py-canon's `reusable-docs.yml` has published this way
+  all along; this closes the gap between the two canons.
+
+- **Breaking.** Generated `docs/` is no longer version-controlled. `adopt.sh`
+  adds `/docs/` to `.gitignore` and untracks what is there; `drift.R` fails a
+  repo that still commits it. The site is a build product with one publisher,
+  which is the position [R Packages (2e)](https://r-pkgs.org/website.html)
+  arrives at as well.
+
+- Deploys run from the default branch only, not from tags. The `github-pages`
+  environment's deployment branch policy names the default branch, so a
+  tag-triggered deploy would block rather than publish -- and the release
+  commit's own push has already deployed it.
+
+- The fleet pin moves to `@v2` across all five shims.
 
 ### Fixed
 
@@ -16,13 +57,6 @@ advanced by `major-tag.yml` after a release is cut, not a release of its own.
   months over an attempt that never reached CRAN, and for that whole time it
   excused a real version-vs-tag drift -- the exact failure the in-flight
   carve-out was supposed to be narrow enough to avoid.
-
-### Added
-
-- The `ci.yml` fixture is now a git repository with a tag, so the
-  version-vs-tag rules are exercised rather than skipped as "no tags, so
-  pre-release". Three named cases: a version ahead of its tag drifts, a fresh
-  submission record excuses it, and a years-old one does not.
 
 ## [1.3.2] - 2026-08-20
 

@@ -15,7 +15,7 @@
 set -euo pipefail
 
 CANON="gojiplus/r-canon"
-REF="v1"
+REF="v2"
 CANON_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 if [ $# -eq 0 ]; then
@@ -74,10 +74,14 @@ on:
 
 jobs:
   pkgdown:
-    # A called workflow cannot grant itself more than the caller has, and the
-    # default token here is read-only. The deploy to gh-pages needs write.
+    # A called workflow cannot grant itself more than the caller has, so every
+    # scope the site build and deploy use has to be granted here. Naming any
+    # scope drops the rest to none, so contents has to be restated even though
+    # it is the default -- omit it and the checkout fails.
     permissions:
-      contents: write
+      contents: read
+      pages: write
+      id-token: write
     uses: $CANON/.github/workflows/reusable-pkgdown.yml@$REF
 YAML
 
@@ -157,6 +161,20 @@ YAML
     echo "$name: added ^\\.lintr\$ to .Rbuildignore"
   fi
 
+  # The site is a build product. CI builds and publishes it, so a committed
+  # docs/ is a second copy that goes stale silently -- tuber's sat three
+  # releases behind the live site before anyone looked. R Packages (2e) ch. 19
+  # reaches the same conclusion from the other direction.
+  if ! grep -qx '/docs/' "$repo/.gitignore" 2>/dev/null; then
+    printf '\n# pkgdown output. Disposable local build product; CI builds and\n# publishes the definitive site.\n/docs/\n' >> "$repo/.gitignore"
+    echo "$name: added /docs/ to .gitignore"
+  fi
+  if git -C "$repo" ls-files --error-unmatch docs >/dev/null 2>&1; then
+    tracked=$(git -C "$repo" ls-files docs | wc -l | tr -d ' ')
+    echo "$name: untracking $tracked committed pkgdown file(s) under docs/"
+    git -C "$repo" rm -r --cached --quiet docs >/dev/null 2>&1 || true
+  fi
+
   # Lint runs in CI, never in the test suite: lintr skips expect_lint_free()
   # on CRAN, and everywhere else the test makes other machines' lintr versions
   # into style oracles for R CMD check.
@@ -173,6 +191,17 @@ YAML
   if [ ! -f "$repo/_pkgdown.yml" ] && [ ! -f "$repo/_pkgdown.yaml" ] &&
      [ ! -f "$repo/pkgdown/_pkgdown.yml" ]; then
     echo "$name: note -- no pkgdown config; the site job will build a default one"
+  fi
+
+  # The one part of adoption that is a repo setting rather than a file, and the
+  # one that fails silently: with Pages still serving a branch, the deploy job
+  # succeeds and publishes nothing anyone can see. Printed rather than run --
+  # this script otherwise touches only the working tree.
+  slug=$(git -C "$repo" remote get-url origin 2>/dev/null |
+    sed -e 's#^git@github\.com:##' -e 's#^https://github\.com/##' -e 's#\.git$##' || true)
+  if [ -n "$slug" ]; then
+    echo "$name: point Pages at Actions, or the deploy publishes nowhere:"
+    echo "    gh api -X PUT repos/$slug/pages -f build_type=workflow"
   fi
 done
 

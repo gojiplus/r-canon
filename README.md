@@ -13,7 +13,7 @@ lines; all the logic lives here, so a fix propagates on the next run.
 | Workflow | What it does |
 |---|---|
 | `reusable-check.yml` | `R CMD check` on Ubuntu release/devel/oldrel-1, macOS, Windows |
-| `reusable-pkgdown.yml` | Builds the site on every push and PR; deploys only from the default branch or a tag |
+| `reusable-pkgdown.yml` | Builds the site on every push and PR; publishes it to GitHub Pages from the default branch |
 | `reusable-coverage.yml` | Runs `covr`; uploads to Codecov when a token exists, keeps an artifact when it doesn't |
 | `reusable-link-check.yml` | Runs `lychee` over README, NEWS, DESCRIPTION, vignettes and `R/`, weekly as well as on push |
 | `reusable-lint.yml` | Checks the repo's `.lintr` is the canonical one, then runs `lintr` |
@@ -41,7 +41,7 @@ on:
     branches: [main, master]
 jobs:
   check:
-    uses: gojiplus/r-canon/.github/workflows/reusable-check.yml@v1
+    uses: gojiplus/r-canon/.github/workflows/reusable-check.yml@v2
 ```
 
 The other four are in [STANDARD.md](STANDARD.md).
@@ -63,8 +63,8 @@ Rscript tools/drift.R ~/Documents/GitHub
 Audits every R package under a directory and exits non-zero if any has drifted —
 wrong workflow filenames, unpinned or missing references, a modified `.lintr`,
 lint in the test suite, no testthat edition 3, no pkgdown config, no LICENSE or
-NEWS.md, a DESCRIPTION version that matches no tag, or leftover bespoke
-workflows.
+NEWS.md, a DESCRIPTION version that matches no tag, generated `docs/` under
+version control, or leftover bespoke workflows.
 
 ## Why this is smaller than py-canon
 
@@ -82,6 +82,6 @@ running six bespoke workflows. That gap is all this repo fills.
 
 ## Versioning
 
-Tags version the workflows together. Repos reference the moving major tag `v1`.
+Tags version the workflows together. Repos reference the moving major tag `v2`.
 Breaking changes — anything that would make a currently-green repo fail — bump
-to `v2`. Each release is recorded in [CHANGELOG.md](CHANGELOG.md).
+the major. Each release is recorded in [CHANGELOG.md](CHANGELOG.md).
