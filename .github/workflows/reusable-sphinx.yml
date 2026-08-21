@@ -1,0 +1,167 @@
+# The fleet's Sphinx build and deploy, for packages documented with rd2sphinx.
+#
+# This is an alternative to reusable-pkgdown.yml, not an addition to it. A
+# repository publishes one site, so a package carries either pkgdown.yml or
+# sphinx-docs.yml. STANDARD.md says which and why.
+#
+# Builds on every push and pull request so a broken site is caught in review.
+# Deploys only from the default branch, and only when the caller asks for it:
+# a package migrating off pkgdown wants to compare the two builds before it
+# hands Pages over, and an artifact costs nothing.
+
+name: reusable-sphinx
+
+on:
+  workflow_call:
+    inputs:
+      docs-dir:
+        description: Sphinx source directory, relative to the repository root.
+        required: false
+        type: string
+        default: sphinx-docs
+      include:
+        description: '"exports" documents the package API; "all" adds internals.'
+        required: false
+        type: string
+        default: exports
+      artifact-name:
+        description: Name of the uploaded HTML artifact.
+        required: false
+        type: string
+        default: sphinx-site
+      deploy:
+        description: Publish to GitHub Pages from the default branch.
+        required: false
+        type: boolean
+        default: false
+      extra-packages:
+        description: Additional R packages, in the r-lib/actions format.
+        required: false
+        type: string
+        default: "local::."
+
+concurrency:
+  group: sphinx-${{ github.event_name != 'pull_request' || github.run_id }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: r-lib/actions/setup-r@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
+        with:
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@d3c5be51b12e724e68f33216ca3c148b66d5f0b6 # v2
+        with:
+          extra-packages: ${{ inputs.extra-packages }}
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      # rd2sphinx documents itself with itself. When the caller IS rd2sphinx,
+      # the checkout is already installed by setup-r-dependencies above, and
+      # installing the published copy over it would test main rather than the
+      # change under review.
+      - name: Install rd2sphinx
+        env:
+          DOCS_DIR: ${{ inputs.docs-dir }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -qx 'Package: rd2sphinx' DESCRIPTION 2>/dev/null; then
+            echo "this repository is rd2sphinx; using the local checkout"
+          else
+            Rscript -e 'install.packages("remotes")' \
+                    -e 'remotes::install_github("gojiplus/rd2sphinx")'
+          fi
+
+      # The scaffold is committed, so requirements.txt pins the Sphinx and Furo
+      # versions this package builds against rather than whatever is newest.
+      - name: Install Sphinx
+        env:
+          DOCS_DIR: ${{ inputs.docs-dir }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f "$DOCS_DIR/requirements.txt" ]; then
+            echo "::error::no $DOCS_DIR/requirements.txt. rd2sphinx::use_sphinx() writes it."
+            exit 1
+          fi
+          python -m pip install --upgrade pip
+          python -m pip install -r "$DOCS_DIR/requirements.txt"
+
+      - name: Render the R reference
+        env:
+          DOCS_DIR: ${{ inputs.docs-dir }}
+          INCLUDE: ${{ inputs.include }}
+        shell: Rscript {0}
+        run: |
+          rd2sphinx::render_sphinx(
+            docs_dir = Sys.getenv("DOCS_DIR"),
+            include = Sys.getenv("INCLUDE")
+          )
+
+      # -W so a dangling cross-reference or a malformed directive fails here
+      # rather than shipping as a broken page; --keep-going so one run reports
+      # every problem instead of the first.
+      - name: Build HTML
+        env:
+          DOCS_DIR: ${{ inputs.docs-dir }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sphinx-build -W --keep-going -b html "$DOCS_DIR" _site
+          for f in index.html objects.inv genindex.html searchindex.js; do
+            if [ ! -f "_site/$f" ]; then
+              echo "::error::the build reported success but produced no _site/$f"
+              exit 1
+            fi
+          done
+          echo "built $(find _site -name '*.html' | wc -l | tr -d ' ') HTML pages"
+
+      # Uploaded on pull requests too, so a site that builds but cannot be
+      # packaged fails in review rather than on the default branch.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: _site
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        if: inputs.deploy
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+
+    if: >
+      inputs.deploy &&
+      github.event_name != 'pull_request' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
