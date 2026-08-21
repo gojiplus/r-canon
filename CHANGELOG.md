@@ -7,6 +7,29 @@ Release tags are `vX.Y.Z`; the fleet-facing major tag (`v2`) is a moving
 pointer advanced by `major-tag.yml` after a release is cut, not a release of
 its own.
 
+## v2.1.0
+
+Added `reusable-sphinx.yml`, a site build for packages documented with
+[rd2sphinx](https://github.com/gojiplus/rd2sphinx) instead of pkgdown. It
+renders the package's Rd topics into semantic Sphinx objects and builds them
+with `sphinx-build -W --keep-going`, uploading the HTML as an artifact and
+deploying to Pages only when the caller passes `deploy: true`.
+
+A repository publishes one site, so at most one workflow may carry
+`deploy: true`. A `sphinx-docs.yml` without it is a parallel build uploading an
+artifact and sits happily beside `pkgdown.yml`; one with it replaces the
+pkgdown shim. `adopt.sh` and `drift.R` both read the flag rather than the
+filename.
+
+Also fixed a disagreement between the two tools that predates this release:
+`adopt.sh` deleted every workflow it found, including `rhub.yaml` and
+`statistical-tests.yml`, which `drift.R` has always named as legitimate. A
+repo could therefore be adopted into the drift the audit was written to
+prevent. Both now work from the same list.
+
+Nothing here changes what a currently-green repo must do, so this is a minor
+release and `v2` moves to it.
+
 ## [Unreleased]
 
 ## [2.0.1] - 2026-08-20

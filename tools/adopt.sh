@@ -63,8 +63,18 @@ for repo in "$@"; do
 
   # Anything already there is either a copy of what we are about to reference
   # or something bespoke. Either way it goes; git keeps it if it is wanted back.
+  #
+  # Except the files drift.R names as legitimate. rhub.yaml is written by
+  # rhub::rhub_setup() and the release checklist in STANDARD.md uses it;
+  # statistical-tests.yml is guess's own, named there as the one bespoke
+  # workflow the fleet has; sphinx-docs.yml is the alternative site build.
+  # Deleting what the audit allows made this script and that one disagree
+  # about the standard, which is the drift this repo exists to prevent.
   existing=()
   while IFS= read -r -d '' f; do
+    case "${f##*/}" in
+      rhub.yaml|rhub.yml|statistical-tests.yml|sphinx-docs.yml) continue ;;
+    esac
     existing+=("$f")
   done < <(find "$wf" -maxdepth 1 \( -name '*.yml' -o -name '*.yaml' \) -print0 2>/dev/null | sort -z)
 
@@ -88,6 +98,15 @@ jobs:
     uses: $CANON/.github/workflows/reusable-check.yml@$REF
 YAML
 
+  # At most one workflow may deploy. A sphinx-docs.yml that passes
+  # deploy: true publishes the site, so the pkgdown shim would race it for the
+  # same Pages deployment. One without it is a parallel build uploading an
+  # artifact, which is how a package compares the two before switching, and
+  # pkgdown stays the published site.
+  if [ -f "$wf/sphinx-docs.yml" ] && grep -qE '^[[:space:]]*deploy:[[:space:]]*true[[:space:]]*$' "$wf/sphinx-docs.yml"; then
+    echo "$name: deploys a Sphinx site; skipping the pkgdown shim"
+    rm -f "$wf/pkgdown.yml"
+  else
   cat > "$wf/pkgdown.yml" <<YAML
 name: pkgdown
 
@@ -112,6 +131,7 @@ jobs:
       id-token: write
     uses: $CANON/.github/workflows/reusable-pkgdown.yml@$REF
 YAML
+  fi
 
   cat > "$wf/test-coverage.yml" <<YAML
 name: test-coverage
@@ -177,7 +197,9 @@ YAML
     echo "$name: kept the inputs already set on $1"
   }
   restore R-CMD-check.yml "$carry_check"
-  restore pkgdown.yml "$carry_pkgdown"
+  if [ -f "$wf/pkgdown.yml" ]; then
+    restore pkgdown.yml "$carry_pkgdown"
+  fi
   restore test-coverage.yml "$carry_coverage"
   restore lint.yml "$carry_lint"
   restore link-check.yml "$carry_links"
@@ -230,7 +252,8 @@ YAML
   git -C "$repo" add -A .github/workflows .lintr >/dev/null 2>&1 || true
   echo "$name: on $CANON@$REF"
 
-  if [ ! -f "$repo/_pkgdown.yml" ] && [ ! -f "$repo/_pkgdown.yaml" ] &&
+  if [ -f "$wf/pkgdown.yml" ] &&
+     [ ! -f "$repo/_pkgdown.yml" ] && [ ! -f "$repo/_pkgdown.yaml" ] &&
      [ ! -f "$repo/pkgdown/_pkgdown.yml" ]; then
     echo "$name: note -- no pkgdown config; the site job will build a default one"
   fi

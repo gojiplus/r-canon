@@ -243,6 +243,75 @@ jobs:
           fi
           echo "ok: inputs already set on a shim survive a rewrite"
 
+      - name: the site rule is about deploying, not about filenames
+        run: |
+          set -euo pipefail
+          # adopt.sh used to delete every workflow it found, so the sixth shim
+          # -- and rhub.yaml and statistical-tests.yml, which drift.R has
+          # always allowed -- did not survive being adopted.
+          cp -r /tmp/fixture /tmp/sphinx-fixture
+          rm -f /tmp/sphinx-fixture/.github/workflows/pkgdown.yml
+          rm -f /tmp/sphinx-fixture/_pkgdown.yml
+          mkdir -p /tmp/sphinx-fixture/sphinx-docs
+          printf "html_theme = 'furo'\n" > /tmp/sphinx-fixture/sphinx-docs/conf.py
+          cat > /tmp/sphinx-fixture/.github/workflows/sphinx-docs.yml <<'YAML'
+          name: sphinx-docs
+          on:
+            push:
+              branches: [main, master]
+          jobs:
+            sphinx:
+              uses: gojiplus/r-canon/.github/workflows/reusable-sphinx.yml@v2
+              with:
+                deploy: true
+          YAML
+          printf 'name: rhub\non: workflow_dispatch\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - run: "true"\n' \
+            > /tmp/sphinx-fixture/.github/workflows/rhub.yaml
+
+          tools/adopt.sh /tmp/sphinx-fixture
+
+          for f in sphinx-docs.yml rhub.yaml; do
+            if [ ! -f "/tmp/sphinx-fixture/.github/workflows/$f" ]; then
+              echo "::error::adopt.sh deleted $f, which drift.R allows"
+              exit 1
+            fi
+            echo "ok: $f survived adoption"
+          done
+          if [ -f /tmp/sphinx-fixture/.github/workflows/pkgdown.yml ]; then
+            echo "::error::adopt.sh wrote a pkgdown shim beside a deploying sphinx-docs.yml"
+            exit 1
+          fi
+          echo "ok: no second deploying site workflow"
+
+          # And the audit agrees: a Sphinx site with no _pkgdown.yml is clean.
+          Rscript tools/drift.R /tmp/sphinx-fixture
+          echo "ok: drift.R passes a Sphinx-site repo"
+
+          # Two DEPLOYING site workflows is drift.
+          cp /tmp/fixture/.github/workflows/pkgdown.yml /tmp/sphinx-fixture/.github/workflows/
+          cp /tmp/fixture/_pkgdown.yml /tmp/sphinx-fixture/_pkgdown.yml
+          if Rscript tools/drift.R /tmp/sphinx-fixture; then
+            echo "::error::drift.R reported two deploying site workflows as clean"
+            exit 1
+          fi
+          echo "ok: detects two deploying site workflows"
+
+          # But a NON-deploying sphinx build beside pkgdown is the tuber pilot,
+          # not drift: it uploads an artifact and never touches Pages.
+          sed -i '/deploy: true/d;/^ *with: *$/d' \
+            /tmp/sphinx-fixture/.github/workflows/sphinx-docs.yml
+          Rscript tools/drift.R /tmp/sphinx-fixture
+          echo "ok: a parallel Sphinx build beside pkgdown is clean"
+
+          # And adopt.sh leaves that repo's pkgdown shim alone.
+          tools/adopt.sh /tmp/sphinx-fixture >/dev/null
+          if [ ! -f /tmp/sphinx-fixture/.github/workflows/pkgdown.yml ]; then
+            echo "::error::adopt.sh dropped the pkgdown shim for a non-deploying sphinx build"
+            exit 1
+          fi
+          echo "ok: pkgdown stays the published site"
+          rm -rf /tmp/sphinx-fixture
+
       - name: drift.R passes a repo that is on the standard
         run: |
           set -euo pipefail

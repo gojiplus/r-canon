@@ -17,12 +17,12 @@ what lives here.
 | | |
 |---|---|
 | CI | References the five reusable workflows below, pinned to `@v2` |
-| Workflow filenames | `R-CMD-check.yml`, `pkgdown.yml`, `test-coverage.yml`, `link-check.yml`, `lint.yml` — exactly these |
+| Workflow filenames | `R-CMD-check.yml`, `test-coverage.yml`, `link-check.yml`, `lint.yml`, and one site workflow: `pkgdown.yml` or `sphinx-docs.yml` — exactly these |
 | Checks on | Ubuntu release/devel/oldrel-1, macOS release, Windows release |
 | Check bar | `R CMD check --as-cran` clean; warnings fail the build |
 | Tests | `testthat`, edition 3, under `tests/testthat/` |
 | Lint | The canonical `.lintr` from this repo, byte-identical, enforced in CI by `lint.yml` — never in the test suite |
-| Docs | roxygen2, and a `pkgdown` site built in CI and published to GitHub Pages; `docs/` is gitignored, never committed |
+| Docs | roxygen2, and a site built in CI and published to GitHub Pages — `pkgdown` by default, or Sphinx via `rd2sphinx`; generated output is gitignored, never committed |
 | Version | Semantic, in `DESCRIPTION`, matching a `v`-prefixed git tag; `.9xxx` dev versions between releases |
 | License | Declared in `DESCRIPTION` with a `LICENSE` file |
 | News | `NEWS.md`, newest first, one section per released version, a `(development version)` header on top between releases |
@@ -181,6 +181,58 @@ carries a deployment branch policy naming that branch, so a tag-triggered
 deploy would sit blocked rather than publish — and nothing is lost, since a
 release is cut from a commit on the default branch and that push already
 deployed it.
+
+## The other site: Sphinx via rd2sphinx
+
+`pkgdown` is the default and most packages should stay on it. A package may
+instead publish a Sphinx site built by
+[rd2sphinx](https://github.com/gojiplus/rd2sphinx), which reads `man/*.Rd`
+through R's own Rd parser and writes semantic Sphinx objects. The shim is
+`sphinx-docs.yml`, calling `reusable-sphinx.yml`:
+
+```yaml
+name: sphinx-docs
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  sphinx:
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: gojiplus/r-canon/.github/workflows/reusable-sphinx.yml@v2
+    with:
+      deploy: true
+```
+
+A repository publishes one site, so at most one workflow may carry
+`deploy: true`. Which files exist is not the constraint. Leaving `deploy` off
+builds the HTML and uploads it as an artifact without touching Pages, so a
+package can run the Sphinx build beside its live pkgdown site and compare the
+two before handing the deployment over. That is what the tuber pilot does, and
+it is not drift.
+
+What is drift is `pkgdown.yml` beside a *deploying* `sphinx-docs.yml`: two
+workflows racing for one Pages deployment, which is how a site ends up serving
+a build nobody can account for. `adopt.sh` skips the pkgdown shim when the
+sphinx one deploys, and `drift.R` fails a repo carrying both.
+
+The build runs `sphinx-build -W --keep-going`, so a dangling cross-reference
+fails review rather than shipping as a broken page. That bar is stricter than
+pkgdown's, which is the point: Rd links become real Sphinx references, and a
+reference that resolves to nothing is a defect the tool can see.
+
+Why this is in the standard at all, given the rule below that a second way to
+do something is drift: the fleet has a package whose documentation *is* the
+Sphinx toolchain, and rd2sphinx is documented with rd2sphinx. A standard that
+forbade its own tooling from using itself would be enforcing consistency
+against the thing consistency is for.
 
 ## Lint and style
 

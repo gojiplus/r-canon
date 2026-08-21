@@ -17,7 +17,8 @@ wanted <- c(
   pkgdown = "pkgdown.yml",
   coverage = "test-coverage.yml",
   links = "link-check.yml",
-  lint = "lint.yml"
+  lint = "lint.yml",
+  sphinx = "sphinx-docs.yml"
 )
 
 reusable <- c(
@@ -25,8 +26,23 @@ reusable <- c(
   pkgdown = "reusable-pkgdown.yml",
   coverage = "reusable-coverage.yml",
   links = "reusable-link-check.yml",
-  lint = "reusable-lint.yml"
+  lint = "reusable-lint.yml",
+  sphinx = "reusable-sphinx.yml"
 )
+
+# A repository publishes one site, so at most one workflow may DEPLOY. Which
+# file exists is not the constraint: sphinx-docs.yml without `deploy: true`
+# builds the HTML and uploads an artifact, which is how a package compares a
+# Sphinx build against its live pkgdown site before switching. Two deploying
+# site workflows would race each other for the same Pages deployment.
+# See STANDARD.md.
+site_shims <- c(pkgdown = "pkgdown.yml", sphinx = "sphinx-docs.yml")
+
+sphinx_deploys <- function(wf_dir) {
+  f <- file.path(wf_dir, "sphinx-docs.yml")
+  if (!file.exists(f)) return(FALSE)
+  any(grepl("^\\s*deploy:\\s*true\\s*$", readLines(f, warn = FALSE)))
+}
 
 # Workflow files beyond the shims that are not drift. rhub.yaml is written by
 # rhub::rhub_setup(), and the release checklist in STANDARD.md uses R-hub v2,
@@ -149,9 +165,33 @@ version_ok <- function(version, tag, submitted = NA_character_) {
   startsWith(version, paste0(sub("^v", "", tag), ".9"))
 }
 
+# Which site the package publishes, read off the workflow it carries. Absent
+# both, report against pkgdown: that is the default the standard states, and
+# "missing pkgdown.yml" is the useful message.
+site_kind_of <- function(wf_dir) {
+  have <- names(site_shims)[file.exists(file.path(wf_dir, site_shims))]
+  if (!"sphinx" %in% have || !sphinx_deploys(wf_dir)) {
+    have <- setdiff(have, "sphinx")
+  }
+  if (length(have) > 1L) return("both")
+  if (length(have) == 1L) return(have)
+  "pkgdown"
+}
+
+# The Sphinx source directory is an input on the shim, defaulting to the one
+# rd2sphinx::use_sphinx() writes.
+sphinx_docs_dir <- function(path) {
+  f <- file.path(path, ".github", "workflows", "sphinx-docs.yml")
+  if (!file.exists(f)) return("sphinx-docs")
+  hit <- grep("^\\s*docs-dir:", readLines(f, warn = FALSE), value = TRUE)
+  if (!length(hit)) return("sphinx-docs")
+  trimws(gsub("[\"\']", "", sub("^\\s*docs-dir:", "", hit[1])))
+}
+
 audit <- function(path, canon_lintr) {
   wf_dir <- file.path(path, ".github", "workflows")
   present <- if (dir.exists(wf_dir)) basename(list.files(wf_dir, "\\.ya?ml$")) else character()
+  site_kind <- site_kind_of(wf_dir)
 
   version <- desc_field(path, "Version")
   tag <- git(path, c("describe", "--tags", "--abbrev=0"))
@@ -167,7 +207,9 @@ audit <- function(path, canon_lintr) {
       if (is.na(r)) desc_field(path, "Config/roxygen2/version") else r
     },
     check = references(path, "check"),
-    pkgdown = references(path, "pkgdown"),
+    site_kind = site_kind,
+    sphinx_dir = sphinx_docs_dir(path),
+    site = if (identical(site_kind, "both")) "two-sites" else references(path, site_kind),
     coverage = references(path, "coverage"),
     links = references(path, "links"),
     lint = references(path, "lint"),
@@ -177,10 +219,14 @@ audit <- function(path, canon_lintr) {
     # can sit on edition 2 -- still using context() and expect_that(is_a()), both
     # deprecated -- and pass this audit as "tests: yes".
     edition = desc_field(path, "Config/testthat/edition"),
-    pkgdown_cfg = any(file.exists(
-      file.path(path, c("_pkgdown.yml", "_pkgdown.yaml")),
-      file.path(path, "pkgdown", c("_pkgdown.yml", "_pkgdown.yaml"))
-    )),
+    site_cfg = if (identical(site_kind, "sphinx")) {
+      file.exists(file.path(path, sphinx_docs_dir(path), "conf.py"))
+    } else {
+      any(file.exists(
+        file.path(path, c("_pkgdown.yml", "_pkgdown.yaml")),
+        file.path(path, "pkgdown", c("_pkgdown.yml", "_pkgdown.yaml"))
+      ))
+    },
     license = any(file.exists(file.path(path, c("LICENSE", "LICENSE.md")))),
     docs_tracked = docs_tracked(path),
     news = file.exists(file.path(path, "NEWS.md")),
@@ -250,17 +296,17 @@ main <- function(args) {
 
   cat("\n")
   cat(pad("repo", 13), pad("version", 11), pad("tag", 10), pad("roxygen", 9),
-      pad("check", 10), pad("pkgdown", 10), pad("cover", 10), pad("links", 10),
-      pad("lint", 10), pad(".lintr", 9), pad("tests", 6), pad("site", 6),
+      pad("check", 10), pad("site", 10), pad("cover", 10), pad("links", 10),
+      pad("lint", 10), pad(".lintr", 9), pad("tests", 6), pad("cfg", 6),
       "extra\n", sep = "")
   cat(strrep("-", 132), "\n", sep = "")
 
   drifted <- character()
   for (r in rows) {
-    shims <- c(r$check, r$pkgdown, r$coverage, r$links, r$lint)
+    shims <- c(r$check, r$site, r$coverage, r$links, r$lint)
     bad <- !all(shims == "ok") ||
       !identical(r$lintr_cfg, "ok") ||
-      !r$testthat || !r$pkgdown_cfg || length(r$extra) > 0 ||
+      !r$testthat || !r$site_cfg || length(r$extra) > 0 ||
       !identical(ed(r$testthat, r$edition), "ed3") ||
       !r$license || !r$news || r$style_test || !r$version_ok ||
       r$docs_tracked > 0
@@ -272,13 +318,13 @@ main <- function(args) {
       pad(ifelse(is.na(r$tag), "-", r$tag), 10),
       pad(ifelse(is.na(r$roxygen), "-", r$roxygen), 9),
       pad(mark(r$check), 10),
-      pad(mark(r$pkgdown), 10),
+      pad(mark(r$site), 10),
       pad(mark(r$coverage), 10),
       pad(mark(r$links), 10),
       pad(mark(r$lint), 10),
       pad(mark(r$lintr_cfg), 9),
       pad(ed(r$testthat, r$edition), 6),
-      pad(yn(r$pkgdown_cfg), 6),
+      pad(yn(r$site_cfg), 6),
       if (length(r$extra)) paste(r$extra, collapse = " ") else "-",
       "\n",
       sep = ""
@@ -288,6 +334,17 @@ main <- function(args) {
     if (!r$version_ok) {
       note("DRIFT: DESCRIPTION ", r$version, " but latest tag ", r$tag,
            " (release the version or bump to a .9xxx dev version)")
+    }
+    if (identical(r$site_kind, "both")) {
+      note("DRIFT: pkgdown.yml and a deploying sphinx-docs.yml -- ",
+           "two workflows racing for one Pages deployment")
+    }
+    if (!r$site_cfg) {
+      note("DRIFT: no ", if (identical(r$site_kind, "sphinx")) {
+        paste0(r$sphinx_dir, "/conf.py -- rd2sphinx::use_sphinx() writes it")
+      } else {
+        "_pkgdown.yml"
+      })
     }
     if (!r$license) note("DRIFT: no LICENSE file")
     if (!r$news) note("DRIFT: no NEWS.md")
