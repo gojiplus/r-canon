@@ -44,13 +44,17 @@ concurrency:
   group: sphinx-${{ github.event_name != 'pull_request' || github.run_id }}
   cancel-in-progress: false
 
-permissions:
-  contents: read
+# Granted per job rather than here. A workflow-level grant caps every job in
+# the file, and the deploy job below must be able to inherit pages: write from
+# a caller that wants to publish.
 
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+
+    permissions:
+      contents: read
 
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
@@ -154,10 +158,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
-    permissions:
-      pages: write
-      id-token: write
-
+    # Deliberately no `permissions:` block. GitHub checks a called workflow's
+    # requested scopes against the caller's grant when the workflow is loaded,
+    # before any `if:` is evaluated -- so declaring pages: write here would
+    # force every caller to grant it, including one passing deploy: false
+    # precisely because it must never touch Pages. tuber's first run failed to
+    # start for exactly that reason. With no block the job inherits whatever
+    # the caller granted: a deploying caller grants pages: write and
+    # id-token: write, and a non-deploying one grants neither and never runs
+    # this job.
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}

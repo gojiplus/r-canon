@@ -7,6 +7,17 @@ Release tags are `vX.Y.Z`; the fleet-facing major tag (`v2`) is a moving
 pointer advanced by `major-tag.yml` after a release is cut, not a release of
 its own.
 
+## v2.1.1
+
+`reusable-sphinx.yml`'s deploy job no longer declares its own permissions. It
+declared `pages: write` and `id-token: write`, and GitHub validates the scopes
+a called workflow requests when it loads the file, before any `if:` is
+evaluated. A caller passing `deploy: false` therefore had to grant
+`pages: write` for a job it would never run, which is exactly backwards: the
+tuber pilot passes `deploy: false` *because* it must not touch Pages, and its
+first run ended in `startup_failure` rather than building anything. The job now
+inherits whatever the caller granted.
+
 ## v2.1.0
 
 Added `reusable-sphinx.yml`, a site build for packages documented with
