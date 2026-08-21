@@ -223,6 +223,17 @@ workflows racing for one Pages deployment, which is how a site ends up serving
 a build nobody can account for. `adopt.sh` skips the pkgdown shim when the
 sphinx one deploys, and `drift.R` fails a repo carrying both.
 
+The permissions block follows from `deploy`, and getting it wrong stops the
+run before it starts. A caller passing `deploy: true` must grant `pages: write`
+and `id-token: write` alongside `contents: read`, because a called workflow can
+only narrow what the caller holds. A caller that does not deploy grants
+`contents: read` and nothing else, and must not be made to hand out
+`pages: write` for a job it never runs. The reusable workflow's deploy job
+therefore declares no permissions of its own and inherits the caller's:
+GitHub validates the scopes a called workflow requests when it *loads* the
+file, before any `if:` is evaluated, so a static `pages: write` on that job
+would fail every non-deploying caller at startup.
+
 The build runs `sphinx-build -W --keep-going`, so a dangling cross-reference
 fails review rather than shipping as a broken page. That bar is stricter than
 pkgdown's, which is the point: Rd links become real Sphinx references, and a
