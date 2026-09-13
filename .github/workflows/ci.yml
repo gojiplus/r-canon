@@ -118,10 +118,18 @@ jobs:
         with:
           use-public-rspm: true
 
+      - name: Install tool test dependencies
+        run: install.packages(c("yaml", "testthat"))
+        shell: Rscript {0}
+
+      - name: Test workflow parsing
+        run: testthat::test_dir("tests/testthat")
+        shell: Rscript {0}
+
       # A package that satisfies everything STANDARD.md asks for except the
       # workflows and lint config, which adopt.sh is about to write -- plus a
       # planted style test adopt.sh must remove. Built by hand rather than
-      # with usethis so this job needs no packages beyond base R.
+      # with usethis so the fixture does not depend on package scaffolding tools.
       - name: Build a fixture package
         run: |
           set -euo pipefail

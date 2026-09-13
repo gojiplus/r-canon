@@ -60,6 +60,8 @@ writes the current drift table to the run summary.
 Rscript tools/drift.R ~/Documents/GitHub
 ```
 
+`drift.R` requires the CRAN package `yaml`. It parses actual job references rather than matching text in comments.
+
 Audits every R package under a directory and exits non-zero if any has drifted —
 wrong workflow filenames, unpinned or missing references, a modified `.lintr`,
 lint in the test suite, no testthat edition 3, no pkgdown config, no LICENSE or
