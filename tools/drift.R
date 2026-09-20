@@ -100,11 +100,21 @@ git <- function(path, args) {
 references <- function(path, kind) {
   f <- file.path(path, ".github", "workflows", wanted[[kind]])
   if (!file.exists(f)) return("missing")
-  txt <- paste(readLines(f, warn = FALSE), collapse = "\n")
+  if (!requireNamespace("yaml", quietly = TRUE)) stop("Install yaml to inspect workflows.")
+  workflow <- tryCatch(yaml::read_yaml(f, eval.expr = FALSE), error = identity)
+  if (inherits(workflow, "error")) return("invalid-yaml")
+  jobs <- if (is.list(workflow)) workflow$jobs else NULL
+  refs <- vapply(jobs, function(job) {
+    if (is.list(job) && is.character(job$uses) && length(job$uses) == 1L) {
+      job$uses
+    } else {
+      ""
+    }
+  }, character(1))
   want <- paste0(canon_repo, "/.github/workflows/", reusable[[kind]])
-  if (!grepl(want, txt, fixed = TRUE)) return("not-canon")
-  if (!grepl(paste0(want, pin), txt, fixed = TRUE)) return("unpinned")
-  "ok"
+  if (any(refs == paste0(want, pin))) return("ok")
+  if (any(startsWith(refs, paste0(want, "@")))) return("unpinned")
+  "not-canon"
 }
 
 # Generated pkgdown output under version control. CI builds and publishes the

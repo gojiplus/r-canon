@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Parse workflow job references with `yaml` so comments and `@v20` cannot satisfy an `@v2` check; report malformed YAML explicitly.
+- Test reference parsing with positive and adversarial fixtures. `drift.R` now requires `yaml`.
+- Compare consumer lint configuration with the documented `v2` standard.
+
 All notable changes to the standard are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
