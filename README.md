@@ -85,5 +85,10 @@ running six bespoke workflows. That gap is all this repo fills.
 ## Versioning
 
 Tags version the workflows together. Repos reference the moving major tag `v2`.
-Breaking changes — anything that would make a currently-green repo fail — bump
-the major. Each release is recorded in [CHANGELOG.md](CHANGELOG.md).
+Breaking requirement changes use a new major channel with migration guidance.
+Each release is recorded in [CHANGELOG.md](CHANGELOG.md). Promotion requires
+successful CI for the target default-branch commit. Record the resolved commit
+when reporting conformance; a moving tag alone is not a reproducible identity.
+
+[Authority and conformance](STANDARD.md#authority-and-conformance) describes
+which requirements the drift audit checks and which require consumer runs.
