@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## [Unreleased]
+
+- Require successful CI for the target default-branch commit before promoting
+  a major tag, and default manual promotion to the current `v2` channel.
+- Define authority, conformance scope, revision provenance, consumer-test
+  limits, and coordinated changes to requirements and implementations.
 
 - Parse workflow job references with `yaml` so comments and `@v20` cannot satisfy an `@v2` check; report malformed YAML explicitly.
 - Test reference parsing with positive and adversarial fixtures. `drift.R` now requires `yaml`.
@@ -46,8 +51,6 @@ prevent. Both now work from the same list.
 
 Nothing here changes what a currently-green repo must do, so this is a minor
 release and `v2` moves to it.
-
-## [Unreleased]
 
 ## [2.0.1] - 2026-08-20
 

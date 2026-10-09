@@ -12,6 +12,32 @@ one standard, because `r-lib/actions` ships example workflows to **copy** rather
 than workflows to **reference**. Copies drift. That gap, and only that gap, is
 what lives here.
 
+## Authority and conformance
+
+STANDARD.md defines the R fleet requirements. Reusable workflows, the canonical
+`.lintr`, adoption scripts, and drift checks implement those requirements. A
+conflict between prose and behavior is a defect to resolve, not an implicit
+exception. R CMD check, testthat, lintr, and the documentation tools remain the
+underlying checks; r-canon coordinates their use across repositories.
+
+`FLEET` records monitored repositories. `tools/drift.R` checks selected
+configuration and adoption rules; it does not execute package tests or certify
+scientific correctness. Report its findings alongside the consumer's actual
+check, lint, coverage, and documentation runs. Record consumer and r-canon
+commits, tool versions, skipped or unavailable checks, and any reviewed
+exceptions. A partial or empty assessment cannot establish full conformance.
+
+Changes to requirements include affected workflow/script changes, positive and
+negative fixtures, and migration notes in CHANGELOG.md. The local `tools` CI
+job tests adoption and rejection of drift; the reusable package-check and site
+build workflows additionally need representative consumer runs. State that
+coverage rather than claiming local fixtures execute every consumer job.
+
+Release tags are immutable snapshots; a major tag such as `v2` is an update
+channel. Record its resolved commit for assessments. Promotion requires the
+target commit to be on the default branch and to have a successful CI run there.
+Breaking requirement changes use a new major channel with migration guidance.
+
 ## What every package does
 
 | | |
