@@ -7,6 +7,11 @@ that keep them on it without copy-paste.
 five platforms, testthat, roxygen2, pkgdown, semantic versions matching tags.
 Changing the fleet's mind is a pull request to that file.
 
+[Implementation guidance](STANDARD.md#implementation-guidance) covers modern R
+validation and structured conditions, building on Posit's R development skills
+and *R Packages*. These are review defaults, not dependency mandates or new
+automated drift checks.
+
 **The machinery:** five reusable workflows. Repos reference them in a few
 lines; all the logic lives here, so a fix propagates on the next run.
 
