@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Add implementation-review guidance for argument validation, vector semantics,
+  structured conditions, and behavioral tests, with official Posit/r-lib sources.
+  This is advisory: no workflow, drift-check, or dependency migration is required.
+
 - Require successful CI for the target default-branch commit before promoting
   a major tag, and default manual promotion to the current `v2` channel.
 - Define authority, conformance scope, revision provenance, consumer-test

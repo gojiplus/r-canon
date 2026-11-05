@@ -10,7 +10,8 @@ R already has good, better-maintained answers for most of what py-canon carries:
 is the conformance bar. What R has no answer for is keeping a *set* of repos on
 one standard, because `r-lib/actions` ships example workflows to **copy** rather
 than workflows to **reference**. Copies drift. That gap, and only that gap, is
-what lives here.
+what lives here. The implementation guidance below records fleet review defaults
+while relying on upstream R tooling and documentation.
 
 ## Authority and conformance
 
@@ -52,6 +53,66 @@ Breaking requirement changes use a new major channel with migration guidance.
 | Version | Semantic, in `DESCRIPTION`, matching a `v`-prefixed git tag; `.9xxx` dev versions between releases |
 | License | Declared in `DESCRIPTION` with a `LICENSE` file |
 | News | `NEWS.md`, newest first, one section per released version, a `(development version)` header on top between releases |
+
+## Implementation guidance
+
+These are review defaults for new or substantially revised R code, not additional
+automated conformance gates. `tools/drift.R` does not inspect implementation
+quality or require these dependencies. Existing packages can adopt the guidance
+as their APIs change; this addition requires no workflow or dependency migration.
+
+Use established libraries for general argument validation, vector semantics, and
+conditions. Keep scientific constraints explicit in the package: a generic type
+check cannot establish valid weights, identifiers, sampling designs, or inference.
+Prefer the smallest coherent dependency set that removes substantial duplicated
+machinery; importing the tidyverse metapackage is not a prerequisite.
+
+| Need | Default to consider |
+|---|---|
+| User-facing errors and warnings | `cli::cli_abort()` / `cli::cli_warn()` for contextual messages; `rlang::abort()` / `rlang::warn()` for structured conditions |
+| Scalar arguments and allowed choices | A consistent set of predicates or `checkmate` assertions; `rlang::arg_match()` for exact choices and `rlang::check_dots_empty()` for unused `...` |
+| Vector type, size, coercion, and recycling | `vctrs` where its semantics fit the API; explicitly define accepted types, missingness, size, and lossy-cast behavior |
+| Package workflow | `usethis`, `devtools`, `roxygen2`, `testthat` edition 3, and `pkgdown` |
+
+Consult the current official references before choosing APIs. For example,
+[`vec_assert()` and `vec_is()` are questioning](https://vctrs.r-lib.org/reference/vec_assert.html);
+the maintainers recommend `obj_check_vector()` / `obj_is_vector()` for vector
+checks, `vec_check_size()` for size, and type predicates or `vec_cast()` as
+appropriate. Casting is a deliberate API decision, not a substitute for rejecting
+invalid inputs. Small base-R checks remain appropriate when they express the
+contract clearly; avoid inventing another general-purpose assertion framework.
+
+Give errors stable package-specific classes when callers need to distinguish
+failures. Put machine-readable issue codes, fields, and evidence in condition
+metadata; consumers should not parse prose. Preserve the originating condition
+with `parent` when translating an error and report the caller rather than a
+private validation helper. See the official
+[`rlang` condition reference](https://rlang.r-lib.org/reference/abort.html) and
+[`cli` error reference](https://cli.r-lib.org/reference/cli_abort.html).
+
+Test accepted and rejected inputs, boundary cases, and observable behavior. For
+conditions, assert the class and metadata that callers depend on; use snapshots
+when reviewing the rendered diagnostic is valuable. A snapshot of an error
+message alone does not verify a machine-readable contract. When replacing manual
+validation, check the intended behavior for `NULL`, missing values, empty vectors,
+wrong sizes, classes, coercion, and recycling rather than merely shortening code.
+
+Use upstream guidance rather than maintaining a second R development handbook:
+
+- [R Packages, by Hadley Wickham and Jenny Bryan](https://r-pkgs.org/).
+- [Posit's R package development skills](https://github.com/posit-dev/skills/tree/main/r-lib),
+  especially `r-package-development`, `r-cli`, `r-testthat`, and
+  `r-tidyverse-style`. The package-development skill credits Simon P. Couch.
+- Official references for [argument matching](https://rlang.r-lib.org/reference/arg_match.html),
+  [unused dots](https://rlang.r-lib.org/reference/check_dots_empty.html), and
+  [checkmate](https://mllg.github.io/checkmate/).
+
+Read the relevant upstream skill when available; it is guidance, not an implicit
+change to this fleet's standard. In particular, retain the formatter selected
+below until a separate tooling migration is agreed. Use R syntax supported by
+the package's declared minimum R version. Modernization should improve the API
+and its implementation without introducing unrelated formatting or dependency
+changes.
 
 ## Consuming it
 
