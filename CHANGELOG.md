@@ -1,6 +1,15 @@
 # Changelog
 
+All notable changes to the standard are documented here.
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+Release tags are `vX.Y.Z`; the fleet-facing major tag (`v2`) is a moving
+pointer advanced by `major-tag.yml` after a release is cut, not a release of
+its own.
+
 ## [Unreleased]
+
+## v2.2.0
 
 - Pin the Ubuntu jobs of the check, coverage, lint, pkgdown and Sphinx
   workflows to `ubuntu-24.04`. On the image `ubuntu-latest` now resolves to,
@@ -21,12 +30,8 @@
 - Test reference parsing with positive and adversarial fixtures. `drift.R` now requires `yaml`.
 - Compare consumer lint configuration with the documented `v2` standard.
 
-All notable changes to the standard are documented here.
-
-The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-Release tags are `vX.Y.Z`; the fleet-facing major tag (`v2`) is a moving
-pointer advanced by `major-tag.yml` after a release is cut, not a release of
-its own.
+- Ships the v2.1.1 change below, which was never tagged, so `v2` had stayed
+  at v2.1.0.
 
 ## v2.1.1
 
