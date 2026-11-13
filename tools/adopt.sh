@@ -222,11 +222,19 @@ YAML
     echo "$name: added ^\\.lintr\$ to .Rbuildignore"
   fi
 
+  # A repo's spelling exceptions live in .codespellrc, which is infrastructure
+  # for the same reason .lintr is.
+  if [ -f "$repo/.codespellrc" ] && [ -f "$repo/.Rbuildignore" ] &&
+     ! grep -qF '^\.codespellrc$' "$repo/.Rbuildignore"; then
+    printf '^\\.codespellrc$\n' >> "$repo/.Rbuildignore"
+    echo "$name: added ^\\.codespellrc\$ to .Rbuildignore"
+  fi
+
   # The site is a build product. CI builds and publishes it, so a committed
   # docs/ is a second copy that goes stale silently -- tuber's sat three
   # releases behind the live site before anyone looked. R Packages (2e) ch. 19
   # reaches the same conclusion from the other direction.
-  # Any spelling git already honours counts: a bare `docs` ignores the
+  # Any spelling git already honors counts: a bare `docs` ignores the
   # directory just as well as `/docs/`, and appending a second entry beside it
   # would be noise in a file people read.
   if ! grep -qE '^/?docs/?$' "$repo/.gitignore" 2>/dev/null; then
@@ -249,7 +257,7 @@ YAML
     git -C "$repo" add -A tests/testthat/test-pkg-style.R >/dev/null 2>&1 || true
   fi
 
-  git -C "$repo" add -A .github/workflows .lintr >/dev/null 2>&1 || true
+  git -C "$repo" add -A .github/workflows .lintr .Rbuildignore >/dev/null 2>&1 || true
   echo "$name: on $CANON@$REF"
 
   if [ -f "$wf/pkgdown.yml" ] &&

@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+- Require US English. `reusable-lint.yml` runs codespell with the `clear`,
+  `rare` and `en-GB_to_en-US` dictionaries and fails on a misspelling. CI here
+  runs the same command on this repo and on fixtures: US English passes,
+  British spelling fails, words in `.codespellrc` pass, and a `.codespellrc`
+  that drops the British dictionary still fails.
+  Migration: run `codespell --builtin clear,rare,en-GB_to_en-US` in the
+  package, fix what it reports (regenerating `man/` after roxygen edits), and
+  put words the package does not own in `.codespellrc`. A package with British
+  spelling fails `lint.yml` once it consumes a release that includes this.
+- `adopt.sh` registers an existing `.codespellrc` in `.Rbuildignore`.
+
 - Add implementation-review guidance for argument validation, vector semantics,
   structured conditions, and behavioral tests, with official Posit/r-lib sources.
   This is advisory: no workflow, drift-check, or dependency migration is required.

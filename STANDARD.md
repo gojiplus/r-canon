@@ -49,6 +49,7 @@ Breaking requirement changes use a new major channel with migration guidance.
 | Check bar | `R CMD check --as-cran` clean; warnings fail the build |
 | Tests | `testthat`, edition 3, under `tests/testthat/` |
 | Lint | The canonical `.lintr` from this repo, byte-identical, enforced in CI by `lint.yml` — never in the test suite |
+| Spelling | US English: codespell with `clear,rare,en-GB_to_en-US`, enforced in CI by `lint.yml` |
 | Docs | roxygen2, and a site built in CI and published to GitHub Pages — `pkgdown` by default, or Sphinx via `rd2sphinx`; generated output is gitignored, never committed |
 | Version | Semantic, in `DESCRIPTION`, matching a `v`-prefixed git tag; `.9xxx` dev versions between releases |
 | License | Declared in `DESCRIPTION` with a `LICENSE` file |
@@ -376,6 +377,22 @@ CRAN, so the test is dead weight exactly where tests matter, and everywhere
 else it makes other machines' lintr versions into style oracles for
 `R CMD check`. `adopt.sh` deletes the file; `drift.R` fails a repo that has
 one. lintr does not need to sit in `Suggests` for CI to run it.
+
+### US English
+
+Every package is written in US English: file contents throughout the repo,
+identifiers included. `reusable-lint.yml` runs codespell with the `clear`,
+`rare` and `en-GB_to_en-US` dictionaries, and a misspelling fails the lint
+job. The dictionaries are named in the workflow, so a repo cannot drop one.
+
+A repo's `.codespellrc` holds only its exceptions: `skip` for data and
+generated files, and `ignore-words-list` for words it does not own, such as a
+value an upstream API spells the British way or a quoted title. A single line can carry
+`# codespell:ignore` instead. `.codespellrc` is registered in `.Rbuildignore`;
+`adopt.sh` adds the entry when the file exists.
+
+Generated `man/*.Rd` files are checked, because they ship; fix the roxygen
+comment and regenerate. `DESCRIPTION` sets `Language: en-US`.
 
 ## Inputs, and why there are so few
 
