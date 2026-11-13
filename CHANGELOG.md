@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- Pin the Ubuntu jobs of the check, coverage, lint, pkgdown and Sphinx
+  workflows to `ubuntu-24.04`. On the image `ubuntu-latest` now resolves to,
+  `sudo` ignores `-E`, so `r-lib/actions/setup-r-dependencies` (v2.14.0) loses
+  `R_LIB_FOR_PAK` and fails installing pak with "zero-length 'path' argument".
+  Return to `ubuntu-latest` once r-lib/actions handles that image.
+
 - Add implementation-review guidance for argument validation, vector semantics,
   structured conditions, and behavioral tests, with official Posit/r-lib sources.
   This is advisory: no workflow, drift-check, or dependency migration is required.
