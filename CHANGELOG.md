@@ -1,5 +1,12 @@
 # Changelog
 
+All notable changes to the standard are documented here.
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+Release tags are `vX.Y.Z`; the fleet-facing major tag (`v2`) is a moving
+pointer advanced by `major-tag.yml` after a release is cut, not a release of
+its own.
+
 ## [Unreleased]
 
 - Require US English. `reusable-lint.yml` runs codespell with the `clear`,
@@ -12,6 +19,14 @@
   put words the package does not own in `.codespellrc`. A package with British
   spelling fails `lint.yml` once it consumes a release that includes this.
 - `adopt.sh` registers an existing `.codespellrc` in `.Rbuildignore`.
+
+## v2.2.0
+
+- Pin the Ubuntu jobs of the check, coverage, lint, pkgdown and Sphinx
+  workflows to `ubuntu-24.04`. On the image `ubuntu-latest` now resolves to,
+  `sudo` ignores `-E`, so `r-lib/actions/setup-r-dependencies` (v2.14.0) loses
+  `R_LIB_FOR_PAK` and fails installing pak with "zero-length 'path' argument".
+  Return to `ubuntu-latest` once r-lib/actions handles that image.
 
 - Add implementation-review guidance for argument validation, vector semantics,
   structured conditions, and behavioral tests, with official Posit/r-lib sources.
@@ -26,12 +41,8 @@
 - Test reference parsing with positive and adversarial fixtures. `drift.R` now requires `yaml`.
 - Compare consumer lint configuration with the documented `v2` standard.
 
-All notable changes to the standard are documented here.
-
-The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-Release tags are `vX.Y.Z`; the fleet-facing major tag (`v2`) is a moving
-pointer advanced by `major-tag.yml` after a release is cut, not a release of
-its own.
+- Ships the v2.1.1 change below, which was never tagged, so `v2` had stayed
+  at v2.1.0.
 
 ## v2.1.1
 
