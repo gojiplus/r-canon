@@ -9,6 +9,8 @@ its own.
 
 ## [Unreleased]
 
+## v2.3.0
+
 - Require US English. `reusable-lint.yml` runs codespell with the `clear`,
   `rare` and `en-GB_to_en-US` dictionaries and fails on a misspelling. CI here
   runs the same command on this repo and on fixtures: US English passes,
