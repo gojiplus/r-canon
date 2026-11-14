@@ -36,7 +36,9 @@ testthat::test_that("promotion requires successful CI and fails on API errors", 
     ARGUMENTS = file.path(dir, "arguments"), TARGET = strrep("a", 40),
     DEFAULT_BRANCH = "main", GH_EXIT = "0"
   )
-  for (conclusion in c("failure", "", "cancelled", "null", "skipped", "success")) {
+  # The conclusions are GitHub's own spellings.
+  conclusions <- c("failure", "", "cancelled", "null", "skipped", "success") # codespell:ignore
+  for (conclusion in conclusions) {
     Sys.setenv(CI_CONCLUSION = conclusion)
     status <- system2("bash", shQuote(script), stdout = FALSE, stderr = FALSE)
     testthat::expect_identical(status, if (conclusion == "success") 0L else 1L)
