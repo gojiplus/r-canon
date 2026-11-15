@@ -13,13 +13,25 @@
 # Third, lintr itself, which needs the package's dependencies installed
 # because the default linters include object_usage_linter.
 #
-# No inputs, like the check matrix: a repo that needs a different lint config
-# needs a conversation, not a knob.
+# The lint config itself has no knob, like the check matrix: a repo that needs
+# a different one needs a conversation. The one input, extra-packages, only
+# changes which dependencies get installed -- lintr needs the package
+# installed, and an uninstallable Suggests entry would otherwise stop it.
 
 name: reusable-lint
 
 on:
   workflow_call:
+    inputs:
+      extra-packages:
+        description: >
+          Package references added to the ones this workflow installs, in the
+          r-lib/actions format. For a Suggests entry that cannot be installed
+          (an archived package: "BRugs=?ignore"), which otherwise stops
+          dependency resolution before lintr runs.
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -62,7 +74,10 @@ jobs:
 
       - uses: r-lib/actions/setup-r-dependencies@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2
         with:
-          extra-packages: any::lintr, local::.
+          extra-packages: |
+            any::lintr
+            local::.
+            ${{ inputs.extra-packages }}
           needs: lint
 
       - name: lintr

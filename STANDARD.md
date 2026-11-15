@@ -399,7 +399,8 @@ comment and regenerate. `DESCRIPTION` sets `Language: en-US`.
 The check matrix is **not** an input. It is the five configurations CRAN runs,
 and a package needing a different set needs a conversation rather than a knob —
 a standard you can configure your way out of is not a standard. Drift re-enters
-through options. The lint workflow has no inputs at all, for the same reason.
+through options. The lint workflow's rules have no inputs, for the same reason;
+its one input only adds dependencies to install.
 
 The inputs that do exist cover the places packages legitimately differ:
 
@@ -411,8 +412,10 @@ The inputs that do exist cover the places packages legitimately differ:
 | check | `not-cran` | Run the `skip_on_cran()` tests. Off by default; see below |
 | check | `tinytex` | The package has a PDF vignette (`pdf_document` or Sweave). Without LaTeX, `R CMD build` fails at "creating vignettes" and nothing gets checked |
 | check | `tinytex-packages` | With `tinytex`, LaTeX packages a Sweave vignette loads that TinyTeX lacks; rmarkdown vignettes install their own |
+| coverage | `extra-packages` | Added to `covr` and `xml2`. For a Suggests entry that cannot be installed, such as an archived package (`BRugs=?ignore`) |
 | coverage | `not-cran` | The same, so coverage does not under-report what those tests cover |
 | pkgdown | `extra-packages` | Same, for the site build |
+| lint | `extra-packages` | Added to `lintr` and the package. Same use as coverage's: lintr needs the package installed |
 | link-check | `paths` | A package whose prose lives somewhere other than the default set. One glob per line — a bare directory name matches nothing and still exits 0 |
 | link-check | `exclude` | URL regexes to skip. For service endpoints that appear in source as string constants: an API base URL answers 404 to an unauthenticated GET by design |
 

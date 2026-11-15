@@ -9,6 +9,13 @@ its own.
 
 ## [Unreleased]
 
+- `extra-packages` input on the coverage and lint workflows, empty by default
+  and added to what each installs. Both install the package's dependencies,
+  and a Suggests entry archived on CRAN (R2WinBUGS's BRugs) stops pak's
+  resolution before covr or lintr runs, with no way around it from the repo.
+  The check and pkgdown workflows already had the input; `BRugs=?ignore` there
+  is what got R2WinBUGS's check and site past the same failure.
+
 - `tinytex` and `tinytex-packages` inputs on the check workflow, off by
   default. A PDF vignette (`output: pdf_document`, or Sweave) cannot build on
   a runner without LaTeX, so `R CMD build` fails at "creating vignettes" and
