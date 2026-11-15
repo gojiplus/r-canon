@@ -10,6 +10,15 @@ name: reusable-coverage
 on:
   workflow_call:
     inputs:
+      extra-packages:
+        description: >
+          Package references added to the ones this workflow installs, in the
+          r-lib/actions format. For a Suggests entry that cannot be installed
+          (an archived package: "BRugs=?ignore"), which otherwise stops
+          dependency resolution before coverage runs.
+        required: false
+        type: string
+        default: ""
       not-cran:
         description: >
           Set NOT_CRAN=true so skip_on_cran() tests run here too. covr does
@@ -50,9 +59,18 @@ jobs:
         with:
           use-public-rspm: true
 
+      # Installed up front, as in the check and pkgdown workflows. Without it,
+      # setup-r-dependencies probes for pandoc by resolving the package's
+      # dependencies itself, ignoring extra-packages, so an archived Suggests
+      # entry fails there even when extra-packages says to skip it.
+      - uses: r-lib/actions/setup-pandoc@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2
+
       - uses: r-lib/actions/setup-r-dependencies@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2
         with:
-          extra-packages: any::covr, any::xml2
+          extra-packages: |
+            any::covr
+            any::xml2
+            ${{ inputs.extra-packages }}
           needs: coverage
 
       - name: Compute coverage
