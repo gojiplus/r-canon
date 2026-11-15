@@ -51,6 +51,25 @@ on:
         required: false
         type: boolean
         default: false
+      tinytex:
+        description: >
+          Install TinyTeX so PDF vignettes build. A package whose vignette is
+          output: pdf_document, or a Sweave .Rnw, cannot pass R CMD build on a
+          runner without LaTeX: the check fails at "creating vignettes" before
+          any of the package is checked. Off by default because most of the
+          fleet has HTML vignettes and the install adds a minute per leg.
+        required: false
+        type: boolean
+        default: false
+      tinytex-packages:
+        description: >
+          Extra LaTeX packages to tlmgr install, space- or comma-separated.
+          rmarkdown installs missing packages on demand; Sweave's texi2pdf
+          does not, so an .Rnw vignette names here whatever its preamble
+          loads that TinyTeX lacks (e.g. "a4wide").
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -84,6 +103,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: r-lib/actions/setup-pandoc@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2
+
+      - if: inputs.tinytex
+        uses: r-lib/actions/setup-tinytex@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2
+
+      # pwsh runs on all three runner OSes and finds tlmgr.bat on Windows,
+      # which bash does not; the list arrives through env, not interpolated.
+      - if: inputs.tinytex && inputs.tinytex-packages != ''
+        shell: pwsh
+        env:
+          TINYTEX_PACKAGES: ${{ inputs.tinytex-packages }}
+        run: tlmgr install ($env:TINYTEX_PACKAGES -split '[\s,]+' | Where-Object { $_ })
 
       - uses: r-lib/actions/setup-r@f9a764fea8d5c63df6ef9a5c7795bf7deb5d7e05 # v2
         with:

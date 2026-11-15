@@ -9,6 +9,15 @@ its own.
 
 ## [Unreleased]
 
+- `tinytex` and `tinytex-packages` inputs on the check workflow, off by
+  default. A PDF vignette (`output: pdf_document`, or Sweave) cannot build on
+  a runner without LaTeX, so `R CMD build` fails at "creating vignettes" and
+  the package is never checked at all. mi, R2WinBUGS and R2OpenBUGS were the
+  first adopters to hit it. `tinytex-packages` exists because Sweave's
+  `texi2pdf`, unlike rmarkdown, does not install missing LaTeX packages on
+  demand: the BUGS vignettes stop on `a4wide.sty`. Nothing changes for a repo
+  that does not set them.
+
 ## v2.3.0
 
 - Require US English. `reusable-lint.yml` runs codespell with the `clear`,
