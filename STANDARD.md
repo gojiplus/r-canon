@@ -409,6 +409,8 @@ The inputs that do exist cover the places packages legitimately differ:
 | check | `error-on` | Temporarily loosening to `"error"` while a warning is fixed. Say in a comment when it goes back |
 | check | `extra-packages` | A package whose checks need something beyond `rcmdcheck` |
 | check | `not-cran` | Run the `skip_on_cran()` tests. Off by default; see below |
+| check | `tinytex` | The package has a PDF vignette (`pdf_document` or Sweave). Without LaTeX, `R CMD build` fails at "creating vignettes" and nothing gets checked |
+| check | `tinytex-packages` | With `tinytex`, LaTeX packages a Sweave vignette loads that TinyTeX lacks; rmarkdown vignettes install their own |
 | coverage | `not-cran` | The same, so coverage does not under-report what those tests cover |
 | pkgdown | `extra-packages` | Same, for the site build |
 | link-check | `paths` | A package whose prose lives somewhere other than the default set. One glob per line — a bare directory name matches nothing and still exits 0 |
