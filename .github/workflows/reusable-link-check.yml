@@ -1,4 +1,4 @@
-# The fleet's dead-link check.
+# The fleet's dead-link check, with the paths an R package ships.
 #
 # R has a link checker already -- `urlchecker`, and the URL step in
 # `R CMD check --as-cran` -- and neither one covers this. Both read R's own URL
@@ -9,8 +9,9 @@
 # are correct!" against the same tree because it saw 22 URLs and the badge was
 # not among them.
 #
-# So this runs lychee, which reads the files as text and finds every URL in
-# them, and it complements rather than replaces the R-native checks.
+# The lychee job itself lives in gojiplus/.github, shared with the Python and
+# other repos; this file only supplies the R defaults. A repo's URL exclusions
+# go in lychee.toml at its root, which lychee reads by itself.
 
 name: reusable-link-check
 
@@ -31,64 +32,12 @@ on:
           DESCRIPTION
           vignettes/**/*.Rmd
           R/**/*.R
-      exclude:
-        description: >
-          URL regexes to skip, one per line. For service endpoints that appear
-          in source as string constants rather than as documents -- an API base
-          URL answers 404 to an unauthenticated GET by design.
-        required: false
-        type: string
-        default: ""
 
 permissions:
   contents: read
 
 jobs:
   links:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      # Built here rather than interpolated into the action's `args` directly,
-      # so a glob containing a space survives as one argument.
-      - name: Assemble the lychee arguments
-        id: args
-        env:
-          PATHS: ${{ inputs.paths }}
-          EXCLUDE: ${{ inputs.exclude }}
-        run: |
-          set -euo pipefail
-          args=""
-          while IFS= read -r pattern; do
-            [ -n "$pattern" ] || continue
-            args="$args --exclude '$pattern'"
-          done <<< "$EXCLUDE"
-          while IFS= read -r path; do
-            [ -n "$path" ] || continue
-            args="$args '$path'"
-          done <<< "$PATHS"
-          printf 'value=%s\n' "$args" >> "$GITHUB_OUTPUT"
-
-      - name: Check links
-        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
-        with:
-          # 429 is a rate limit, which says nothing about whether the link
-          # exists. Everything else outside 2xx fails, including 5xx: a server
-          # error that survives three retries is a signal, not noise. No
-          # --cache, because it writes .lycheecache into the repo root and
-          # every package would then need it in .gitignore *and* .Rbuildignore
-          # to keep it out of the tarball -- too much to impose fleet-wide for
-          # a couple of seconds on a few dozen URLs.
-          args: >-
-            --no-progress
-            --max-retries 3
-            --accept 200..=299,429
-            ${{ steps.args.outputs.value }}
-          fail: true
-          # A glob that goes stale stops matching silently. This will not catch
-          # one stale glob among several, but it does catch the case where the
-          # whole set stops matching and the job would otherwise report green
-          # over nothing.
-          failIfEmpty: true
-          jobSummary: true
+    uses: gojiplus/.github/.github/workflows/reusable-link-check.yml@v1
+    with:
+      paths: ${{ inputs.paths }}
