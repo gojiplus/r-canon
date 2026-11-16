@@ -9,6 +9,13 @@ its own.
 
 ## [Unreleased]
 
+## v2.5.0
+
+Removes the link check's `exclude` input, which strictly calls for a major
+version. It ships on `v2` because no caller passes it any more: tuber, tubern,
+rdomains and virustotal, the four that did, moved their lists to `lychee.toml`
+first.
+
 - `reusable-link-check.yml` calls the shared lychee workflow in
   gojiplus/.github, which Python and other repos use too, and keeps only the
   R default `paths`. Its `exclude` input is gone: a repo's exclusions go in
