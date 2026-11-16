@@ -246,6 +246,9 @@ itself, so the same list serves this workflow, preen and the pre-commit hook:
 exclude = ['^https://api\.example\.org/v1$']
 ```
 
+Add `^lychee\.toml$` to `.Rbuildignore` with it, or `R CMD check` notes a
+non-standard file at the top level.
+
 ## The site
 
 `pkgdown` builds it, GitHub Actions publishes it, and the generated HTML never
