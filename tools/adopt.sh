@@ -27,11 +27,10 @@ fi
 # canonical reusable workflow named in $2, so rewriting the file does not
 # discard it.
 #
-# The inputs a repo sets there are configuration, not drift: link-check
-# exclude lists name the API endpoints that answer 404 to an unauthenticated
-# GET, and dropping them turns the job red on the next push. Three repos lost
-# theirs to this rewrite before the carry-over existed, and only caught it
-# because a human read the diff.
+# The inputs a repo sets there are configuration, not drift: a link-check
+# `paths` list or a check's `extra-packages`, and dropping them turns the job
+# red on the next push. Three repos lost theirs to this rewrite before the
+# carry-over existed, and only caught it because a human read the diff.
 #
 # `secrets:` ends the block rather than joining it -- the coverage shim writes
 # its own, and carrying a second copy would duplicate the key.

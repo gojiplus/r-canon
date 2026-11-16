@@ -237,6 +237,15 @@ pointed at a renamed workflow and returned 404 for months while `urlchecker`
 reported "All URLs are correct!" against the same tree. Keep using `urlchecker`
 for `\url{}` in `Rd` and for its redirect fixes; it answers a different question.
 
+A URL that is alive but fails a bare GET -- an API base URL appearing in source
+as a string constant answers 404 to an unauthenticated request by design -- goes
+under `exclude` in `lychee.toml` at the repo root. lychee reads that file by
+itself, so the same list serves this workflow, preen and the pre-commit hook:
+
+```toml
+exclude = ['^https://api\.example\.org/v1$']
+```
+
 ## The site
 
 `pkgdown` builds it, GitHub Actions publishes it, and the generated HTML never
@@ -417,7 +426,6 @@ The inputs that do exist cover the places packages legitimately differ:
 | pkgdown | `extra-packages` | Same, for the site build |
 | lint | `extra-packages` | Added to `lintr` and the package. Same use as coverage's: lintr needs the package installed |
 | link-check | `paths` | A package whose prose lives somewhere other than the default set. One glob per line — a bare directory name matches nothing and still exits 0 |
-| link-check | `exclude` | URL regexes to skip. For service endpoints that appear in source as string constants: an API base URL answers 404 to an unauthenticated GET by design |
 
 ## Action pinning
 

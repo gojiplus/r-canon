@@ -9,6 +9,13 @@ its own.
 
 ## [Unreleased]
 
+- `reusable-link-check.yml` calls the shared lychee workflow in
+  gojiplus/.github, which Python and other repos use too, and keeps only the
+  R default `paths`. Its `exclude` input is gone: a repo's exclusions go in
+  `lychee.toml`, which lychee reads by itself, so preen, the pre-commit hook
+  and this workflow share one list. Accepted status codes now match preen's:
+  400, 401, 403 and 405 join 429.
+
 ## v2.4.0
 
 - `extra-packages` input on the coverage and lint workflows, empty by default
